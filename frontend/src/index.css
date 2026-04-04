@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@import url('https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap');
+
+@theme {
+  --color-brand-green: #97B545;
+  --color-brand-dark: #0F3714;
+  --color-brand-forest: #1D5823;
+  --color-brand-gold: #DDB01D;
+
+  --font-sans: 'General Sans', system-ui, sans-serif;
+}
+
+* {
+  font-family: var(--font-sans);
+}
+
+/* Tailwind v4 preflight can strip user-select from inputs — restore it */
+input, textarea, select {
+  user-select: text;
+  cursor: auto;
+}
+
+/* Ensure body cursor is never lost */
+body {
+  cursor: default;
+}

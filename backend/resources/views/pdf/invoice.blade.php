@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ $type === 'receipt' ? 'Receipt' : 'Invoice' }} {{ $invoice->invoice_number }}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: DejaVu Sans, sans-serif;
+      font-size: 10px;
+      color: #1a1a1a;
+      background: #ffffff;
+    }
+
+    .page { padding: 36px 40px; min-height: 100%; }
+
+    /* ── Header ── */
+    .header {
+      width: 100%;
+      margin-bottom: 28px;
+      border-bottom: 3px solid #0F3714;
+      padding-bottom: 20px;
+    }
+    .header-inner { width: 100%; }
+    .logo-cell    { width: 55%; vertical-align: top; }
+    .doc-type-cell { width: 45%; vertical-align: top; text-align: right; }
+
+    .logo-block {
+      display: inline-block;
+      background: #0F3714;
+      padding: 8px 14px 8px 12px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+    .logo-ll {
+      font-size: 22px;
+      font-weight: bold;
+      color: #97B545;
+      letter-spacing: 2px;
+      display: block;
+      line-height: 1;
+    }
+    .logo-name {
+      font-size: 7px;
+      color: rgba(255,255,255,0.85);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      display: block;
+      margin-top: 3px;
+    }
+    .business-detail {
+      font-size: 8.5px;
+      color: #555;
+      line-height: 1.7;
+      margin-top: 4px;
+    }
+    .doc-type {
+      font-size: 32px;
+      font-weight: bold;
+      color: #0F3714;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+    .invoice-number {
+      font-size: 13px;
+      font-weight: bold;
+      color: #97B545;
+      margin-top: 4px;
+    }
+
+    /* ── Bill To / Invoice Info ── */
+    .meta-section  { width: 100%; margin-bottom: 24px; }
+    .bill-to-cell  { width: 55%; vertical-align: top; }
+    .invoice-info-cell { width: 45%; vertical-align: top; text-align: right; }
+
+    .section-label {
+      font-size: 7.5px;
+      font-weight: bold;
+      color: #97B545;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 5px;
+    }
+    .customer-name {
+      font-size: 13px;
+      font-weight: bold;
+      color: #0F3714;
+      margin-bottom: 2px;
+    }
+    .address-line { font-size: 9px; color: #444; line-height: 1.6; }
+    .job-ref      { font-size: 9px; color: #666; margin-top: 8px; font-style: italic; }
+
+    .info-table   { font-size: 9px; width: 100%; }
+    .info-table td { padding: 2px 0; line-height: 1.6; }
+    .info-label   { color: #888; text-align: right; padding-right: 10px; width: 50%; }
+    .info-value   { font-weight: bold; color: #1a1a1a; text-align: right; }
+
+    /* ── Line Items Table ── */
+    .items-table { width: 100%; border-collapse: collapse; margin-bottom: 0; }
+    .items-table thead tr { background: #0F3714; color: white; }
+    .items-table thead th {
+      padding: 8px 10px;
+      font-size: 8px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-align: left;
+    }
+    .items-table thead th.right { text-align: right; }
+    .items-table tbody tr { border-bottom: 1px solid #f3f4f6; }
+    .items-table tbody tr.labour-row   { background: #ffffff; }
+    .items-table tbody tr.material-row { background: #f9fafb; }
+    .items-table tbody td {
+      padding: 7px 10px;
+      font-size: 9.5px;
+      color: #1a1a1a;
+      vertical-align: top;
+    }
+    .items-table tbody td.right { text-align: right; }
+    .items-table tbody td.muted { color: #6b7280; }
+
+    .type-pill {
+      display: inline-block;
+      font-size: 6.5px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin-left: 5px;
+      vertical-align: middle;
+    }
+    .pill-labour   { background: #dcfce7; color: #15803d; }
+    .pill-material { background: #fef3c7; color: #92400e; }
+
+    /* ── Totals ── */
+    .totals-wrapper { width: 100%; margin-top: 0; }
+    .totals-spacer  { width: 55%; vertical-align: top; }
+    .totals-block   { width: 45%; vertical-align: top; }
+    .totals-table   { width: 100%; border-collapse: collapse; }
+    .totals-table td { padding: 5px 10px; font-size: 9.5px; }
+    .totals-table .t-label { color: #555; text-align: left; }
+    .totals-table .t-value { text-align: right; font-weight: bold; color: #1a1a1a; }
+    .totals-table .discount-row td { color: #dc2626; }
+    .total-due-row { background: #0F3714; }
+    .total-due-row td {
+      color: white !important;
+      font-size: 11px !important;
+      font-weight: bold !important;
+      padding: 9px 10px !important;
+    }
+    .total-due-row .t-value {
+      color: #97B545 !important;
+      font-size: 13px !important;
+    }
+
+    /* ── Payment Section ── */
+    .payment-section {
+      margin-top: 24px;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 16px;
+    }
+    .payment-grid         { width: 100%; }
+    .payment-terms-cell   { width: 55%; vertical-align: top; }
+    .payment-notes-cell   { width: 45%; vertical-align: top; text-align: right; padding-left: 16px; }
+
+    .payment-box {
+      background: #f0fdf4;
+      border: 1.5px solid #86efac;
+      border-radius: 6px;
+      padding: 10px 14px;
+      display: inline-block;
+      text-align: left;
+      width: 100%;
+    }
+    .payment-box-label {
+      font-size: 7.5px;
+      font-weight: bold;
+      color: #15803d;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 5px;
+    }
+    .payment-box-detail { font-size: 9px; color: #1a1a1a; line-height: 1.7; }
+    .payment-box-amount { font-size: 15px; font-weight: bold; color: #0F3714; margin-top: 4px; }
+    .variance-over  { font-size: 8px; color: #15803d; margin-top: 2px; }
+    .variance-under { font-size: 8px; color: #dc2626; margin-top: 2px; }
+
+    .bank-details { font-size: 8.5px; color: #555; line-height: 1.8; }
+    .bank-details strong { color: #0F3714; }
+
+    .notes-box {
+      background: #f9fafb;
+      border-left: 3px solid #97B545;
+      padding: 8px 12px;
+      font-size: 8.5px;
+      color: #555;
+      line-height: 1.6;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: 32px;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 12px;
+      width: 100%;
+    }
+    .footer-left  { width: 60%; vertical-align: middle; }
+    .footer-right { width: 40%; vertical-align: middle; text-align: right; }
+    .footer-thanks  { font-size: 9px; color: #97B545; font-weight: bold; }
+    .footer-sub     { font-size: 7.5px; color: #aaa; margin-top: 2px; }
+    .footer-website { font-size: 8px; color: #0F3714; font-weight: bold; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  {{-- ── Header ── --}}
+  <div class="header">
+    <table class="header-inner" cellpadding="0" cellspacing="0">
+      <tr>
+        <td class="logo-cell">
+          <div class="logo-block">
+            <span class="logo-ll">LL</span>
+            <span class="logo-name">Lennon Landscaping</span>
+          </div>
+          <div class="business-detail">
+            Millstreet, Co. Cork<br>
+            info@lennonlandscaping.ie &nbsp;·&nbsp; lennonlandscaping.ie<br>
+            VAT Reg: IE8972984Q
+          </div>
+        </td>
+        <td class="doc-type-cell">
+          <div class="doc-type">{{ $type === 'receipt' ? 'Receipt' : 'Invoice' }}</div>
+          <div class="invoice-number">{{ $invoice->invoice_number }}</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  {{-- ── Bill To / Invoice Info ── --}}
+  <table class="meta-section" cellpadding="0" cellspacing="0">
+    <tr>
+      <td class="bill-to-cell">
+        <div class="section-label">Bill To</div>
+        <div class="customer-name">{{ ucwords(strtolower($invoice->customer->name)) }}</div>
+
+        @if($invoice->customer->address)
+          @php $addr = $invoice->customer->address @endphp
+          @if($addr->address_line_1)
+            <div class="address-line">{{ ucwords(strtolower($addr->address_line_1)) }}</div>
+          @endif
+          @if($addr->address_line_2)
+            <div class="address-line">{{ ucwords(strtolower($addr->address_line_2)) }}</div>
+          @endif
+          @if($addr->city)
+            <div class="address-line">{{ ucwords(strtolower($addr->city)) }}{{ $addr->county ? ', ' . ucwords(strtolower($addr->county)) : '' }}</div>
+          @endif
+          @if($addr->postcode)
+            <div class="address-line">{{ strtoupper($addr->postcode) }}</div>
+          @endif
+        @endif
+
+        @if($invoice->customer->email)
+          <div class="address-line" style="margin-top:4px; color:#97B545;">{{ $invoice->customer->email }}</div>
+        @endif
+
+        <div class="job-ref">Re: {{ $invoice->job->title }}</div>
+      </td>
+      <td class="invoice-info-cell">
+        <table class="info-table" cellpadding="0" cellspacing="0">
+          <tr>
+            <td class="info-label">{{ $type === 'receipt' ? 'Receipt No.' : 'Invoice No.' }}</td>
+            <td class="info-value">{{ $invoice->invoice_number }}</td>
+          </tr>
+          <tr>
+            <td class="info-label">Date Issued</td>
+            <td class="info-value">{{ $invoice->issued_date->format('d/m/Y') }}</td>
+          </tr>
+          @if($type === 'invoice')
+            <tr>
+              <td class="info-label">Due Date</td>
+              <td class="info-value">{{ $invoice->due_date->format('d/m/Y') }}</td>
+            </tr>
+          @endif
+          @if($type === 'receipt' && $invoice->paid_at)
+            <tr>
+              <td class="info-label">Paid On</td>
+              <td class="info-value">{{ $invoice->paid_at->format('d/m/Y') }}</td>
+            </tr>
+          @endif
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  {{-- ── Line Items ── --}}
+  <table class="items-table" cellpadding="0" cellspacing="0">
+    <thead>
+      <tr>
+        <th style="width:65%">Description</th>
+        <th class="right" style="width:15%">Hours / Qty</th>
+        <th class="right" style="width:20%">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      @php
+        $labourItems   = $invoice->lineItems->where('type', 'labour');
+        $materialItems = $invoice->lineItems->where('type', 'material');
+      @endphp
+
+      @foreach($labourItems as $item)
+        <tr class="labour-row">
+          <td>
+            {{ $item->description }}
+            <span class="type-pill pill-labour">Labour</span>
+          </td>
+          <td class="right muted">{{ number_format($item->quantity, 1) }}h</td>
+          <td class="right">€{{ number_format($item->amount, 2) }}</td>
+        </tr>
+      @endforeach
+
+      @if($materialItems->isNotEmpty())
+        <tr>
+          <td colspan="3" style="padding: 4px 10px; font-size:7.5px; font-weight:bold; color:#92400e; text-transform:uppercase; letter-spacing:1px; background:#fffbeb; border-top:1px solid #fde68a;">
+            Materials &amp; Supplies
+          </td>
+        </tr>
+        @foreach($materialItems as $item)
+          <tr class="material-row">
+            <td>
+              {{ $item->description }}
+              <span class="type-pill pill-material">Material</span>
+            </td>
+            <td class="right muted">{{ number_format($item->quantity, 1) }}</td>
+            <td class="right">€{{ number_format($item->amount, 2) }}</td>
+          </tr>
+        @endforeach
+      @endif
+    </tbody>
+  </table>
+
+  {{-- ── Totals ── --}}
+  <table class="totals-wrapper" cellpadding="0" cellspacing="0" style="margin-top:0;">
+    <tr>
+      <td class="totals-spacer"></td>
+      <td class="totals-block">
+        <table class="totals-table" cellpadding="0" cellspacing="0">
+          <tr>
+            <td class="t-label">Subtotal (ex-VAT)</td>
+            <td class="t-value">€{{ number_format($invoice->subtotal, 2) }}</td>
+          </tr>
+
+          @if($invoice->discount_pct > 0)
+            <tr class="discount-row">
+              <td class="t-label">Discount ({{ number_format($invoice->discount_pct, 0) }}%)</td>
+              <td class="t-value">−€{{ number_format($invoice->discount_amount, 2) }}</td>
+            </tr>
+            <tr>
+              <td class="t-label" style="color:#888; font-size:8.5px;">After discount</td>
+              <td class="t-value" style="font-size:8.5px;">€{{ number_format($invoice->subtotal - $invoice->discount_amount, 2) }}</td>
+            </tr>
+          @endif
+
+          <tr>
+            <td class="t-label">VAT ({{ number_format($invoice->vat_rate, 1) }}%)</td>
+            <td class="t-value">€{{ number_format($invoice->vat_amount, 2) }}</td>
+          </tr>
+
+          <tr class="total-due-row">
+            <td class="t-label">{{ $type === 'receipt' ? 'Total Charged' : 'Total Due' }}</td>
+            <td class="t-value">€{{ number_format($invoice->total_due, 2) }}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  {{-- ── Payment Section ── --}}
+  <div class="payment-section">
+    <table class="payment-grid" cellpadding="0" cellspacing="0">
+      <tr>
+        <td class="payment-terms-cell">
+
+          @if($type === 'receipt' && $invoice->amount_paid !== null)
+            {{-- Receipt: show payment confirmation box --}}
+            @php $variance = round($invoice->amount_paid - $invoice->total_due, 2); @endphp
+            <div class="payment-box">
+              <div class="payment-box-label">&#10003; Payment Received</div>
+              <div class="payment-box-amount">€{{ number_format($invoice->amount_paid, 2) }}</div>
+              <div class="payment-box-detail">
+                Method: {{ $invoice->payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Cash' }}<br>
+                @if($invoice->paid_at)Date: {{ $invoice->paid_at->format('d/m/Y') }}@endif
+              </div>
+              @if($variance > 0.005)
+                <div class="variance-over">Overpaid by €{{ number_format($variance, 2) }} — thank you!</div>
+              @elseif($variance < -0.005)
+                <div class="variance-under">Balance outstanding: €{{ number_format(abs($variance), 2) }}</div>
+              @else
+                <div class="variance-over">Paid in full</div>
+              @endif
+              @if($invoice->payment_notes)
+                <div class="payment-box-detail" style="margin-top:4px; color:#6b7280; font-style:italic;">{{ $invoice->payment_notes }}</div>
+              @endif
+            </div>
+
+          @else
+            {{-- Invoice: bank details --}}
+            <div class="section-label" style="margin-bottom:6px;">Payment Details</div>
+            <div class="bank-details">
+              <strong>Bank Transfer:</strong><br>
+              Account Name: Lennon Landscaping<br>
+              Bank: AIB<br>
+              IBAN: IE22 AIBK 9361 5417 3460 64<br>
+              BIC: AIBKIE2D
+            </div>
+            <div class="bank-details" style="margin-top:6px;">
+              <strong>Cash</strong> payments also accepted.
+            </div>
+            <div class="bank-details" style="margin-top:8px; color:#888;">
+              Payment due within 30 days of invoice date.<br>
+              Please quote <strong>{{ $invoice->invoice_number }}</strong> on your transfer.
+            </div>
+          @endif
+
+        </td>
+        <td class="payment-notes-cell" style="vertical-align:bottom;">
+          @if($invoice->notes)
+            <div class="notes-box">
+              <strong style="color:#0F3714; font-size:8px; display:block; margin-bottom:3px;">Note</strong>
+              {{ $invoice->notes }}
+            </div>
+          @endif
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  {{-- ── Footer ── --}}
+  <table class="footer" cellpadding="0" cellspacing="0">
+    <tr>
+      <td class="footer-left">
+        <div class="footer-thanks">Thank you for your business!</div>
+        <div class="footer-sub">Lennon Landscaping &mdash; Professional Landscaping &amp; Garden Services in Millstreet, Co. Cork</div>
+      </td>
+      <td class="footer-right">
+        <div class="footer-website">lennonlandscaping.ie</div>
+        <div class="footer-sub" style="margin-top:2px;">info@lennonlandscaping.ie</div>
+      </td>
+    </tr>
+  </table>
+
+</div>
+</body>
+</html>

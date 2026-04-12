@@ -28,33 +28,64 @@ interface Paginated {
 
 type SortDir = 'asc' | 'desc'
 
+const ACTIVITY_OPTIONS = [
+  { value: '',         label: 'All customers' },
+  { value: '3m',      label: 'Active — last 3 months' },
+  { value: '6m',      label: 'Active — last 6 months' },
+  { value: '12m',     label: 'Active — last 12 months' },
+  { value: 'inactive', label: 'Inactive (12+ months)' },
+]
+
 export default function CustomerList() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const [result, setResult] = useState<Paginated | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const search  = params.get('search') ?? ''
-  const page    = parseInt(params.get('page') ?? '1')
-  const sortDir = (params.get('sort') ?? 'asc') as SortDir
+  const search   = params.get('search') ?? ''
+  const page     = parseInt(params.get('page') ?? '1')
+  const sortDir  = (params.get('sort') ?? 'asc') as SortDir
+  const activity = params.get('activity') ?? ''
 
   useEffect(() => {
     setIsLoading(true)
-    api.get('/customers', { params: { search, page, sort: `name_${sortDir}` } })
+    api.get('/customers', {
+      params: {
+        search:   search   || undefined,
+        page,
+        sort:     `name_${sortDir}`,
+        activity: activity || undefined,
+      },
+    })
       .then(r => setResult(r.data))
       .finally(() => setIsLoading(false))
-  }, [search, page, sortDir])
+  }, [search, page, sortDir, activity])
+
+  function buildParams(overrides: Record<string, string>): Record<string, string> {
+    const next: Record<string, string> = {}
+    if (search)   next.search   = search
+    if (sortDir)  next.sort     = sortDir
+    if (activity) next.activity = activity
+    next.page = String(page)
+    Object.assign(next, overrides)
+    Object.keys(next).forEach(k => { if (!next[k]) delete next[k] })
+    return next
+  }
 
   function handleSearch(e: React.ChangeEvent<HTMLInputElement>) {
-    setParams({ search: e.target.value, page: '1', sort: sortDir })
+    setParams(buildParams({ search: e.target.value, page: '1' }))
+  }
+
+  function handleActivity(value: string) {
+    setParams(buildParams({ activity: value, page: '1' }))
   }
 
   function setPage(p: number) {
-    setParams({ search, page: String(p), sort: sortDir })
+    setParams(buildParams({ page: String(p) }))
   }
 
   function toggleSort() {
-    setParams({ search, page: '1', sort: sortDir === 'asc' ? 'desc' : 'asc' })
+    setParams(buildParams({ sort: sortDir === 'asc' ? 'desc' : 'asc', page: '1' }))
   }
 
   return (
@@ -77,7 +108,7 @@ export default function CustomerList() {
       </div>
 
       {/* Search */}
-      <div className="relative mb-5">
+      <div className="relative mb-3">
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
@@ -88,6 +119,22 @@ export default function CustomerList() {
           placeholder="Search by name, phone, email or eircode…"
           className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545] focus:border-transparent"
         />
+      </div>
+
+      {/* Activity filter */}
+      <div className="flex items-center gap-2 mb-5">
+        <label className="text-xs text-gray-400 font-medium uppercase tracking-wide whitespace-nowrap">Activity</label>
+        <select
+          value={activity}
+          onChange={e => handleActivity(e.target.value)}
+          className={`text-sm border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#97B545] transition-colors ${
+            activity ? 'border-[#97B545] text-[#5a7020] bg-[#97B545]/5' : 'border-gray-200 text-gray-600'
+          }`}
+        >
+          {ACTIVITY_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Table */}
@@ -102,7 +149,6 @@ export default function CustomerList() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left">
-                {/* Name — always visible */}
                 <th className="px-4 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">
                   <button
                     onClick={toggleSort}
@@ -123,127 +169,115 @@ export default function CustomerList() {
                     </span>
                   </button>
                 </th>
-                {/* Eircode — md+ */}
                 <th className="px-4 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Eircode</th>
-                {/* Phone — md+ */}
                 <th className="px-4 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Phone</th>
-                {/* Email — lg+ only */}
                 <th className="px-4 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Email</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {result?.data.map(c => (
-                  <tr key={c.id} onClick={() => navigate(`/customers/${c.id}`)} className="hover:bg-gray-50 transition-colors cursor-pointer">
+                <tr key={c.id} onClick={() => navigate(`/customers/${c.id}`)} className="hover:bg-gray-50 transition-colors cursor-pointer">
 
-                    {/* Name cell */}
-                    <td className="px-4 py-3">
-                      {/* Line 1: Name */}
-                      <span className="font-medium text-gray-900">{toTitleCase(c.name)}</span>
+                  <td className="px-4 py-3">
+                    <span className="font-medium text-gray-900">{toTitleCase(c.name)}</span>
 
-                      {/* Mobile only — Line 2: Eircode (left) + Phone (right) */}
-                      <div className="md:hidden flex justify-between items-center mt-1">
-                        <span>
-                          {c.address?.postcode ? (
-                            <a
-                              href={`https://maps.google.com/?q=${encodeURIComponent(c.address.postcode)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-[#97B545] font-medium tracking-wide"
-                              onClick={e => e.stopPropagation()}
-                            >
-                              {c.address.postcode.toUpperCase()}
-                            </a>
-                          ) : (
-                            <span className="text-xs text-gray-300">—</span>
-                          )}
-                        </span>
-                        <span>
-                          {c.phone ? (
-                            <a
-                              href={`tel:${phoneHref(c.phone)}`}
-                              className="text-xs text-gray-500"
-                              onClick={e => e.stopPropagation()}
-                            >
-                              {formatPhone(c.phone)}
-                            </a>
-                          ) : (
-                            <span className="text-xs text-gray-300">—</span>
-                          )}
-                        </span>
-                      </div>
+                    <div className="md:hidden flex justify-between items-center mt-1">
+                      <span>
+                        {c.address?.postcode ? (
+                          <a
+                            href={`https://maps.google.com/?q=${encodeURIComponent(c.address.postcode)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-[#97B545] font-medium tracking-wide"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            {c.address.postcode.toUpperCase()}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
+                      </span>
+                      <span>
+                        {c.phone ? (
+                          <a
+                            href={`tel:${phoneHref(c.phone)}`}
+                            className="text-xs text-gray-500"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            {formatPhone(c.phone)}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
+                      </span>
+                    </div>
 
-                      {/* Mobile only — Line 3: Email */}
-                      {c.email && (
-                        <a
-                          href={`mailto:${c.email}`}
-                          className="md:hidden block text-xs text-gray-400 mt-0.5"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          {c.email.toLowerCase()}
-                        </a>
-                      )}
+                    {c.email && (
+                      <a
+                        href={`mailto:${c.email}`}
+                        className="md:hidden block text-xs text-gray-400 mt-0.5"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {c.email.toLowerCase()}
+                      </a>
+                    )}
 
-                      {/* md only (tablet) — email sub-line, hidden on lg+ where it gets its own column */}
-                      {c.email && (
-                        <a
-                          href={`mailto:${c.email}`}
-                          className="hidden md:block lg:hidden text-xs text-gray-400 hover:text-[#97B545] mt-0.5 transition-colors"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          {c.email.toLowerCase()}
-                        </a>
-                      )}
-                    </td>
+                    {c.email && (
+                      <a
+                        href={`mailto:${c.email}`}
+                        className="hidden md:block lg:hidden text-xs text-gray-400 hover:text-[#97B545] mt-0.5 transition-colors"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {c.email.toLowerCase()}
+                      </a>
+                    )}
+                  </td>
 
-                    {/* Eircode — md+ */}
-                    <td className="px-4 py-3 hidden md:table-cell">
-                      {c.address?.postcode ? (
-                        <a
-                          href={`https://maps.google.com/?q=${encodeURIComponent(c.address.postcode)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#97B545] hover:underline font-medium tracking-wide"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          {c.address.postcode.toUpperCase()}
-                        </a>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    {c.address?.postcode ? (
+                      <a
+                        href={`https://maps.google.com/?q=${encodeURIComponent(c.address.postcode)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#97B545] hover:underline font-medium tracking-wide"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {c.address.postcode.toUpperCase()}
+                      </a>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </td>
 
-                    {/* Phone — md+ */}
-                    <td className="px-4 py-3 hidden md:table-cell">
-                      {c.phone ? (
-                        <a
-                          href={`tel:${phoneHref(c.phone)}`}
-                          className="text-gray-600 hover:text-[#97B545] transition-colors"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          {formatPhone(c.phone)}
-                        </a>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    {c.phone ? (
+                      <a
+                        href={`tel:${phoneHref(c.phone)}`}
+                        className="text-gray-600 hover:text-[#97B545] transition-colors"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {formatPhone(c.phone)}
+                      </a>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </td>
 
-                    {/* Email — lg+ */}
-                    <td className="px-4 py-3 hidden lg:table-cell">
-                      {c.email ? (
-                        <a
-                          href={`mailto:${c.email}`}
-                          className="text-gray-600 hover:text-[#97B545] transition-colors"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          {c.email.toLowerCase()}
-                        </a>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
+                  <td className="px-4 py-3 hidden lg:table-cell">
+                    {c.email ? (
+                      <a
+                        href={`mailto:${c.email}`}
+                        className="text-gray-600 hover:text-[#97B545] transition-colors"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {c.email.toLowerCase()}
+                      </a>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </td>
 
-
-                  </tr>
+                </tr>
               ))}
             </tbody>
           </table>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\FieldJob;
+use App\Models\Invoice;
 use App\Services\RateCalculationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,7 +12,11 @@ class JobController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = FieldJob::with(['customer:id,name', 'customer.address:id,customer_id,postcode'])
+        $query = FieldJob::with([
+                'customer:id,name',
+                'customer.address:id,customer_id,postcode',
+                'invoice:id,field_job_id,invoice_number,status',
+            ])
             ->withCount('workLogs');
 
         if ($request->filled('status')) {
@@ -86,7 +91,15 @@ class JobController extends Controller
         // Add computed totals
         $totals = $this->computeTotals($job);
 
-        return response()->json(array_merge($job->toArray(), ['totals' => $totals]));
+        // Attach invoice summary if one exists
+        $invoice = Invoice::where('field_job_id', $job->id)
+            ->select('id', 'invoice_number', 'status', 'total_due', 'issued_date')
+            ->first();
+
+        return response()->json(array_merge($job->toArray(), [
+            'totals'  => $totals,
+            'invoice' => $invoice,
+        ]));
     }
 
     public function update(Request $request, FieldJob $job): JsonResponse

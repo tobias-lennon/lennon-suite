@@ -4,6 +4,12 @@ import api from '../../lib/api'
 import { toTitleCase } from '../../lib/formatters'
 import Spinner from '../../components/Spinner'
 
+const INVOICE_STATUS_COLOURS: Record<string, string> = {
+  draft: 'bg-gray-100 text-gray-600',
+  sent:  'bg-blue-100 text-blue-700',
+  paid:  'bg-green-100 text-green-700',
+}
+
 interface Employee { id: number; name: string }
 interface WorkLogEntry {
   id: number
@@ -39,8 +45,16 @@ interface Totals {
   total_labour_charged: number
   total_labour_cost: number
   total_materials: number
+  callout_fee: number
   total_charged: number
   margin: number
+}
+interface InvoiceSummary {
+  id: number
+  invoice_number: string
+  status: string
+  total_due: number
+  issued_date: string
 }
 interface Job {
   id: number
@@ -59,6 +73,7 @@ interface Job {
   project: { id: number; name: string } | null
   work_logs: WorkLog[]
   totals: Totals
+  invoice: InvoiceSummary | null
 }
 
 const STATUS_COLOURS: Record<string, string> = {
@@ -92,6 +107,7 @@ export default function JobDetail() {
   const [expandedLogs, setExpandedLogs] = useState<Set<number>>(new Set())
   const [statusUpdating, setStatusUpdating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [creatingInvoice, setCreatingInvoice] = useState(false)
 
   useEffect(() => {
     api.get(`/jobs/${id}`).then(res => {
@@ -121,6 +137,17 @@ export default function JobDetail() {
     navigate('/jobs')
   }
 
+  async function createInvoice() {
+    if (!job) return
+    setCreatingInvoice(true)
+    try {
+      const res = await api.post('/invoices', { field_job_id: job.id })
+      navigate(`/invoices/${res.data.id}`)
+    } finally {
+      setCreatingInvoice(false)
+    }
+  }
+
   if (isLoading) {
     return <div className="flex justify-center py-12"><Spinner /></div>
   }
@@ -135,7 +162,7 @@ export default function JobDetail() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div className="min-w-0">
-          <Link to="/jobs" className="text-sm text-gray-400 hover:text-gray-600">← Jobs</Link>
+          <button onClick={() => navigate(-1)} className="text-sm text-gray-400 hover:text-gray-600">← Back</button>
           <h1 className="text-xl font-semibold text-gray-900 mt-1 truncate">{job.title}</h1>
           <p className="text-sm text-gray-500">
             {job.customer ? (
@@ -151,14 +178,14 @@ export default function JobDetail() {
         <div className="flex gap-2 shrink-0">
           <Link
             to={`/jobs/${id}/edit`}
-            className="px-3 py-1.5 rounded-lg text-sm border border-gray-300 hover:bg-gray-50"
+            className="min-w-[52px] text-center px-3 py-1.5 rounded-lg text-sm border border-gray-300 hover:bg-gray-50"
           >
             Edit
           </Link>
           {job.status !== 'complete' && (
             <Link
               to={`/jobs/${id}/logs/new`}
-              className="px-3 py-1.5 rounded-lg text-sm text-white font-medium"
+              className="min-w-[90px] text-center px-3 py-1.5 rounded-lg text-sm text-white font-medium"
               style={{ backgroundColor: '#97B545' }}
             >
               + Log work
@@ -238,6 +265,58 @@ export default function JobDetail() {
             <p className="text-xs text-gray-400 mt-2">
               {job.customer.discount_pct}% discount applied to this customer's rates.
             </p>
+          )}
+        </div>
+      )}
+
+      {/* Invoice panel */}
+      {job.status === 'complete' && job.type !== 'internal' && (
+        <div className={`rounded-lg border mb-6 ${
+          job.invoice
+            ? 'border-gray-200 bg-white cursor-pointer hover:bg-gray-50 transition-colors'
+            : 'border-amber-200 bg-amber-50'
+        }`}
+          onClick={job.invoice ? () => navigate(`/invoices/${job.invoice!.id}`) : undefined}
+        >
+          {job.invoice ? (
+            <div className="flex items-center justify-between gap-4 p-4">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Invoice</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-[#0F3714]">{job.invoice.invoice_number}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${INVOICE_STATUS_COLOURS[job.invoice.status] ?? ''}`}>
+                    {job.invoice.status === 'draft' ? 'Not Sent' : job.invoice.status.charAt(0).toUpperCase() + job.invoice.status.slice(1)}
+                  </span>
+                </div>
+              </div>
+              <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-4 p-4">
+              <div>
+                <p className="text-sm font-medium text-amber-800">Not yet invoiced</p>
+                <p className="text-xs text-amber-600 mt-0.5">This job is complete but hasn't been invoiced.</p>
+              </div>
+              <button
+                onClick={createInvoice}
+                disabled={creatingInvoice || job.work_logs.length === 0}
+                title={job.work_logs.length === 0 ? 'Add at least one work log before invoicing' : ''}
+                className="min-w-[130px] flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-white rounded-lg disabled:opacity-50 shrink-0"
+                style={{ backgroundColor: '#0F3714' }}
+              >
+                {creatingInvoice ? (
+                  <>
+                    <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Creating
+                  </>
+                ) : 'Create Invoice'}
+              </button>
+            </div>
           )}
         </div>
       )}

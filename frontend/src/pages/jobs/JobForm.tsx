@@ -69,6 +69,43 @@ export default function JobForm() {
 
   const titleRef = useRef<HTMLInputElement>(null)
 
+  // New customer modal
+  const [showNewCustomerModal, setShowNewCustomerModal] = useState(false)
+  const [newCustomerForm, setNewCustomerForm] = useState({ name: '', type: 'residential', phone: '' })
+  const [newCustomerErrors, setNewCustomerErrors] = useState<Record<string, string>>({})
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false)
+
+  useEffect(() => {
+    if (!showNewCustomerModal) return
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setShowNewCustomerModal(false)
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [showNewCustomerModal])
+
+  async function handleCreateCustomer(e: React.FormEvent) {
+    e.preventDefault()
+    const errs: Record<string, string> = {}
+    if (!newCustomerForm.name.trim()) errs.name = 'Name is required'
+    setNewCustomerErrors(errs)
+    if (Object.keys(errs).length > 0) return
+
+    setIsCreatingCustomer(true)
+    try {
+      const res = await api.post('/customers', {
+        name:  newCustomerForm.name.trim(),
+        type:  newCustomerForm.type,
+        phone: newCustomerForm.phone.trim() || null,
+      })
+      selectCustomer({ id: res.data.id, name: res.data.name })
+      setShowNewCustomerModal(false)
+      setNewCustomerForm({ name: '', type: 'residential', phone: '' })
+    } finally {
+      setIsCreatingCustomer(false)
+    }
+  }
+
   const isInternal = form.type === 'internal'
   const isMaintenance = form.type === 'maintenance'
   const isSiteVisit = form.type === 'site_visit'
@@ -273,9 +310,18 @@ export default function JobForm() {
         {/* Customer search — hidden for internal */}
         {!isInternal && (
           <div className="relative">
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-              Customer <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">
+                Customer <span className="text-red-500">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowNewCustomerModal(true)}
+                className="text-xs text-[#97B545] hover:text-[#85a03d] font-medium transition-colors"
+              >
+                + New customer
+              </button>
+            </div>
 
             {/* Selected customer pill */}
             {selectedCustomerName ? (
@@ -478,6 +524,73 @@ export default function JobForm() {
           </Link>
         </div>
       </form>
+
+      {/* New customer modal */}
+      {showNewCustomerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setShowNewCustomerModal(false)}
+          />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-base font-semibold text-gray-900 mb-4">New Customer</h2>
+            <form onSubmit={handleCreateCustomer} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newCustomerForm.name}
+                  onChange={e => setNewCustomerForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder="Full name"
+                  autoFocus
+                  className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545] ${newCustomerErrors.name ? 'border-red-400' : 'border-gray-300'}`}
+                />
+                {newCustomerErrors.name && <p className="text-red-500 text-xs mt-1">{newCustomerErrors.name}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Type</label>
+                <select
+                  value={newCustomerForm.type}
+                  onChange={e => setNewCustomerForm(p => ({ ...p, type: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
+                >
+                  <option value="residential">Residential</option>
+                  <option value="commercial">Commercial</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={newCustomerForm.phone}
+                  onChange={e => setNewCustomerForm(p => ({ ...p, phone: e.target.value }))}
+                  placeholder="e.g. 087 123 4567"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
+                />
+              </div>
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={isCreatingCustomer}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60"
+                  style={{ backgroundColor: '#97B545' }}
+                >
+                  {isCreatingCustomer ? 'Creating…' : 'Create & select'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowNewCustomerModal(false)}
+                  className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

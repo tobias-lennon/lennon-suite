@@ -1,18 +1,51 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../../lib/api'
 import { toTitleCase } from '../../lib/formatters'
 import Spinner from '../../components/Spinner'
 
+function InvoiceTag({ job }: { job: Job }) {
+  const navigate = useNavigate()
+  if (job.type === 'internal' || job.status !== 'complete') return null
+  if (job.invoice) {
+    const colour = job.invoice.status === 'paid'
+      ? 'bg-green-100 text-green-700'
+      : job.invoice.status === 'sent'
+        ? 'bg-blue-100 text-blue-700'
+        : 'bg-gray-100 text-gray-500'
+    return (
+      <button
+        onClick={e => { e.preventDefault(); e.stopPropagation(); navigate(`/invoices/${job.invoice!.id}`) }}
+        className={`px-1.5 py-0.5 rounded text-xs font-medium ${colour}`}
+        title={job.invoice.invoice_number}
+      >
+        {job.invoice.status === 'paid' ? 'Paid' : job.invoice.status === 'sent' ? 'Sent' : 'Invoiced'}
+      </button>
+    )
+  }
+  return (
+    <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+      Invoice needed
+    </span>
+  )
+}
+
+interface InvoiceSummary {
+  id: number
+  invoice_number: string
+  status: string
+}
+
 interface Job {
   id: number
   title: string
-  type: 'standard' | 'maintenance' | 'site_visit'
+  type: 'standard' | 'maintenance' | 'site_visit' | 'internal'
   status: 'backlog' | 'scheduled' | 'in_progress' | 'complete'
   priority: 'normal' | 'high' | 'urgent'
   scheduled_date: string | null
   work_logs_count: number
-  customer: { id: number; name: string; address?: { postcode: string | null } | null }
+  customer: { id: number; name: string; address?: { postcode: string | null } | null } | null
+  invoice: InvoiceSummary | null
 }
 
 interface Paginated {
@@ -185,6 +218,7 @@ export default function JobList() {
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Priority</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Logs</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Invoice</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -192,7 +226,7 @@ export default function JobList() {
                 {result?.data.map(job => (
                   <tr key={job.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">
-                      {toTitleCase(job.customer?.name)}
+                      {toTitleCase(job.customer?.name ?? null)}
                     </td>
                     <td className="px-4 py-3 text-gray-700">{job.title}</td>
                     <td className="px-4 py-3">
@@ -215,6 +249,9 @@ export default function JobList() {
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{job.work_logs_count}</td>
                     <td className="px-4 py-3">
+                      <InvoiceTag job={job} />
+                    </td>
+                    <td className="px-4 py-3">
                       <Link
                         to={`/jobs/${job.id}`}
                         className="text-xs font-medium hover:underline"
@@ -236,13 +273,13 @@ export default function JobList() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-medium text-gray-900 truncate">{job.title}</p>
-                    <p className="text-sm text-gray-500 truncate">{toTitleCase(job.customer?.name)}</p>
+                    <p className="text-sm text-gray-500 truncate">{toTitleCase(job.customer?.name ?? null)}</p>
                   </div>
                   <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOURS[job.status]}`}>
                     {STATUS_LABELS[job.status]}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
+                <div className="flex items-center gap-2 mt-2 flex-wrap text-xs text-gray-400">
                   <span>{TYPE_LABELS[job.type]}</span>
                   {job.priority !== 'normal' && (
                     <span className={`px-1.5 py-0.5 rounded-full ${PRIORITY_COLOURS[job.priority]}`}>
@@ -252,6 +289,7 @@ export default function JobList() {
                   {job.scheduled_date && (
                     <span>{new Date(job.scheduled_date).toLocaleDateString('en-IE')}</span>
                   )}
+                  <InvoiceTag job={job} />
                 </div>
               </Link>
             ))}

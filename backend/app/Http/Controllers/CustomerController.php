@@ -92,6 +92,24 @@ class CustomerController extends Controller
             $query->where('type', $request->type);
         }
 
+        if ($request->filled('activity')) {
+            $cutoff = match($request->activity) {
+                '3m'       => now()->subMonths(3),
+                '6m'       => now()->subMonths(6),
+                '12m'      => now()->subMonths(12),
+                'inactive' => now()->subMonths(12),
+                default    => null,
+            };
+
+            if ($cutoff) {
+                if ($request->activity === 'inactive') {
+                    $query->whereDoesntHave('fieldJobs', fn($q) => $q->where('created_at', '>=', $cutoff));
+                } else {
+                    $query->whereHas('fieldJobs', fn($q) => $q->where('created_at', '>=', $cutoff));
+                }
+            }
+        }
+
         $direction = $request->input('sort') === 'name_desc' ? 'desc' : 'asc';
         $customers = $query->orderBy('name', $direction)->paginate(25);
 
@@ -183,6 +201,54 @@ class CustomerController extends Controller
         $customer->delete();
 
         return response()->json(['message' => 'Customer deleted']);
+    }
+
+    public function history(Customer $customer): JsonResponse
+    {
+        $jobs = $customer->fieldJobs()
+            ->with('workLogs.entries')
+            ->orderBy('scheduled_date', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($job) {
+                $totalCharged = $job->workLogs
+                    ->flatMap(fn($log) => $log->entries)
+                    ->sum('amount_charged');
+
+                return [
+                    'id'              => $job->id,
+                    'title'           => $job->title,
+                    'type'            => $job->type,
+                    'status'          => $job->status,
+                    'scheduled_date'  => $job->scheduled_date?->toDateString(),
+                    'work_logs_count' => $job->workLogs->count(),
+                    'total_charged'   => round((float) $totalCharged, 2),
+                ];
+            });
+
+        $scheduledDates = $jobs->pluck('scheduled_date')->filter()->sort()->values();
+
+        return response()->json([
+            'stats' => [
+                'total_jobs'     => $jobs->count(),
+                'total_visits'   => $jobs->sum('work_logs_count'),
+                'first_job_date' => $scheduledDates->first(),
+                'last_job_date'  => $scheduledDates->last(),
+                'is_returning'   => $jobs->count() > 1,
+            ],
+            'jobs' => $jobs->values(),
+        ]);
+    }
+
+    public function setDiscount(Request $request, Customer $customer): JsonResponse
+    {
+        $data = $request->validate([
+            'discount_pct' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $customer->update(['discount_pct' => $data['discount_pct']]);
+
+        return response()->json($customer->fresh());
     }
 
     public function stats(): JsonResponse

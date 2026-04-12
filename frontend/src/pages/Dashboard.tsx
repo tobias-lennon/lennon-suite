@@ -11,12 +11,26 @@ interface Stats {
   with_email: number
 }
 
-function StatCard({ label, value, sub }: { label: string; value: number | string; sub?: string }) {
-  return (
-    <div className="bg-white rounded-xl p-6 border border-gray-100">
+function StatCard({ label, value, sub, to }: { label: string; value: number | string; sub?: string; to?: string }) {
+  const inner = (
+    <>
       <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">{label}</p>
       <p className="text-3xl font-semibold text-[#0F3714]">{value}</p>
       {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    </>
+  )
+
+  if (to) {
+    return (
+      <Link to={to} className="bg-white rounded-xl p-6 border border-gray-100 hover:border-[#97B545] transition-colors block">
+        {inner}
+      </Link>
+    )
+  }
+
+  return (
+    <div className="bg-white rounded-xl p-6 border border-gray-100">
+      {inner}
     </div>
   )
 }
@@ -69,10 +83,10 @@ export default function Dashboard() {
             ))
           ) : (
             <>
-              <StatCard label="Total" value={stats?.total ?? '—'} />
-              <StatCard label="Residential" value={stats?.residential ?? '—'} />
-              <StatCard label="Commercial" value={stats?.commercial ?? '—'} />
-              <StatCard label="With Email" value={stats?.with_email ?? '—'} sub="reachable by email" />
+              <StatCard label="Total" value={stats?.total ?? '—'} to="/customers" />
+              <StatCard label="Residential" value={stats?.residential ?? '—'} to="/customers?type=residential" />
+              <StatCard label="Commercial" value={stats?.commercial ?? '—'} to="/customers?type=commercial" />
+              <StatCard label="With Email" value={stats?.with_email ?? '—'} sub="reachable by email" to="/customers?has_email=1" />
             </>
           )}
         </div>

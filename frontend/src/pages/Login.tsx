@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo'
+import Spinner from '../components/Spinner'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Login() {
@@ -24,6 +25,8 @@ export default function Login() {
         setError('Cannot reach the server. Is the API running on port 8000?')
       } else if (err.response?.status === 422) {
         setError('Incorrect email or password.')
+      } else if (err.response?.status === 429) {
+        setError('Too many attempts. Please wait a minute and try again.')
       } else {
         setError(`Error: ${err.response?.status ?? err.message}`)
       }
@@ -38,16 +41,11 @@ export default function Login() {
       {/* Brand panel */}
       <div className="bg-[#0F3714] flex flex-col items-center justify-center p-10 md:w-1/2 md:min-h-screen">
         <Logo variant="light" size="lg" />
-        <p className="text-white/30 text-[10px] tracking-[0.35em] uppercase mt-8">
-          Company Suite
-        </p>
       </div>
 
       {/* Login form panel */}
       <div className="flex flex-col items-center justify-center p-8 md:w-1/2 md:min-h-screen bg-white">
         <div className="w-full max-w-sm">
-          <Logo variant="dark" size="sm" className="mb-8" />
-
           <h2 className="text-2xl font-semibold text-[#0F3714] mb-1">Welcome back</h2>
           <p className="text-gray-400 text-sm mb-8">Sign in to your account</p>
 
@@ -106,8 +104,9 @@ export default function Login() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#97B545] hover:bg-[#85a03d] text-white font-semibold py-3 rounded-lg text-sm transition-colors cursor-pointer disabled:opacity-60"
+              className="w-full bg-[#97B545] hover:bg-[#85a03d] text-white font-semibold py-3 rounded-lg text-sm transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
             >
+              {isLoading && <Spinner className="w-4 h-4 text-white" />}
               {isLoading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>

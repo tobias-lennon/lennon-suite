@@ -13,8 +13,9 @@ use App\Http\Controllers\WorkLogController;
 use App\Http\Controllers\WorkLogEntryController;
 use Illuminate\Support\Facades\Route;
 
-// Public
-Route::post('/auth/login', [AuthController::class, 'login']);
+// Public — rate limited to 10 attempts per minute per IP
+Route::post('/auth/login', [AuthController::class, 'login'])
+    ->middleware('throttle:10,1');
 
 // Protected
 Route::middleware('auth:sanctum')->group(function () {

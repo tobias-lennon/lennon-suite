@@ -3,25 +3,183 @@
 @import url('https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap');
 
 @theme {
-  --color-brand-green: #97B545;
-  --color-brand-dark: #0F3714;
+  --color-brand-dark:   #0F3714;
   --color-brand-forest: #1D5823;
-  --color-brand-gold: #DDB01D;
+  --color-brand-lime:   #97B545;
+  --color-brand-gold:   #DDB01D;
+  --color-brand-amber:  #F4BE29;
+  --color-brand-pale:   #FFF48D;
+  --color-brand-terra:  #B84A2A;  /* terracotta — earthy error/danger */
+  --color-cream:        #F0ECE4;
+  --color-cream-card:   #FDFAF5;
+
+  /* alias */
+  --color-brand-green:  #97B545;
 
   --font-sans: 'General Sans', system-ui, sans-serif;
 }
 
-* {
-  font-family: var(--font-sans);
-}
+* { font-family: var(--font-sans); }
 
-/* Tailwind v4 preflight can strip user-select from inputs — restore it */
+html, body, #root { background-color: #F0ECE4; }
+
+/* Tailwind v4 strips user-select — restore */
 input, textarea, select {
   user-select: text;
   cursor: auto;
 }
 
-/* Ensure body cursor is never lost */
-body {
-  cursor: default;
+body { cursor: default; }
+
+/* ── Shared design tokens (in @layer components so Tailwind utilities override) ── */
+
+@layer components {
+
+  /* Card panel — cream tinted, subtle shadow */
+  .card {
+    background: #FDFAF5;
+    border-radius: 1.5rem;
+    border: 1px solid rgba(0,0,0,0.05);
+    box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+  }
+
+  /* Table wrapper — card with overflow:hidden for rounded corners */
+  .table-card {
+    background: #FDFAF5;
+    border-radius: 1.5rem;
+    border: 1px solid rgba(0,0,0,0.05);
+    box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+
+  /* Dark green table header row */
+  .thead-dark {
+    background: #0F3714;
+  }
+
+  .thead-dark th {
+    color: rgba(255,255,255,0.6);
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    padding: 0.875rem 1rem;
+  }
+
+  /* Standard form input — padding in longhand so pl-* utilities override */
+  .field-input {
+    width: 100%;
+    padding-top: 0.75rem;
+    padding-right: 1rem;
+    padding-bottom: 0.75rem;
+    padding-left: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: white;
+    font-size: 0.875rem;
+    color: #111;
+    outline: none;
+    transition: box-shadow 0.15s, border-color 0.15s;
+  }
+
+  .field-input:focus {
+    box-shadow: 0 0 0 3px rgba(151,181,69,0.25);
+    border-color: rgba(151,181,69,0.5);
+  }
+
+  .field-input.field-error {
+    border-color: rgba(184,74,42,0.45);
+    background: rgba(184,74,42,0.04);
+  }
+
+  /* ── Status badges ─────────────────────────────────────────────────────
+     Use .badge + one modifier. Same look across every page.          ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* Job / work state */
+  .badge-backlog     { background: rgba(0,0,0,0.06);        color: #6b7280; }
+  .badge-scheduled   { background: rgba(15,55,20,0.1);      color: #0F3714; }
+  .badge-in-progress { background: rgba(221,176,29,0.22);   color: #0F3714; }
+  .badge-complete    { background: rgba(151,181,69,0.28);   color: #0F3714; }
+
+  /* Invoice state */
+  .badge-draft       { background: rgba(0,0,0,0.06);        color: #6b7280; }
+  .badge-sent        { background: rgba(15,55,20,0.1);      color: #0F3714; }
+  .badge-paid        { background: rgba(151,181,69,0.28);   color: #0F3714; }
+
+  /* Lead state */
+  .badge-new         { background: rgba(15,55,20,0.1);      color: #0F3714; }
+  .badge-contacted   { background: rgba(221,176,29,0.22);   color: #0F3714; }
+  .badge-quoted      { background: rgba(29,88,35,0.14);     color: #1D5823; }
+  .badge-won         { background: rgba(151,181,69,0.28);   color: #0F3714; }
+  .badge-lost        { background: rgba(184,74,42,0.12);    color: #B84A2A; }
+
+  /* Job type */
+  .badge-standard    { background: rgba(151,181,69,0.18);   color: #0F3714; }
+  .badge-maintenance { background: rgba(29,88,35,0.14);     color: #1D5823; }
+  .badge-site-visit  { background: rgba(221,176,29,0.18);   color: #0F3714; }
+  .badge-internal    { background: rgba(0,0,0,0.06);        color: #6b7280; }
+
+  /* Priority */
+  .badge-normal      { background: rgba(0,0,0,0.06);        color: #6b7280; }
+  .badge-high        { background: rgba(221,176,29,0.22);   color: #0F3714; }
+  .badge-urgent      { background: rgba(184,74,42,0.12);    color: #B84A2A; }
+
+  /* ── Notice / alert bands ────────────────────────────────────────────── */
+  .notice {
+    padding: 0.75rem 1rem;
+    border-radius: 0.625rem;
+    font-size: 0.875rem;
+  }
+  .notice-info    { background: rgba(15,55,20,0.05);    border: 1px solid rgba(15,55,20,0.12);    color: #0F3714; }
+  .notice-success { background: rgba(151,181,69,0.1);   border: 1px solid rgba(151,181,69,0.35);  color: #0F3714; }
+  .notice-warning { background: rgba(221,176,29,0.1);   border: 1px solid rgba(221,176,29,0.3);   color: #0F3714; }
+  .notice-error   { background: rgba(184,74,42,0.07);   border: 1px solid rgba(184,74,42,0.25);   color: #B84A2A; }
+
+  /* ── Danger / destructive text links ────────────────────────────────── */
+  .text-danger { color: #B84A2A; }
+  .text-danger:hover { color: #933a20; }
+
+  /* Section label inside cards */
+  .section-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(15,55,20,0.45);
+    margin-bottom: 0.875rem;
+  }
+
+  /* Mobile list card (job / lead rows on small screens) */
+  .row-card {
+    background: #FDFAF5;
+    border-radius: 1rem;
+    border: 1px solid rgba(0,0,0,0.05);
+    box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+    padding: 1rem;
+  }
+
+  /* Table row hover on cream background */
+  .tr-hover:hover {
+    background-color: #F0ECE4;
+  }
+
+  /* Hide scrollbar but keep scrollability */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
 }
+

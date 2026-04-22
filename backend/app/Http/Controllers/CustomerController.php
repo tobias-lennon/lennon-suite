@@ -111,7 +111,16 @@ class CustomerController extends Controller
         }
 
         $direction = $request->input('sort') === 'name_desc' ? 'desc' : 'asc';
-        $customers = $query->orderBy('name', $direction)->paginate(25);
+
+        if ($request->filled('search')) {
+            // Rank exact starts-with matches above mid-string matches, then alpha within each tier
+            $query->orderByRaw('CASE WHEN name LIKE ? THEN 0 ELSE 1 END', [$request->search . '%'])
+                  ->orderBy('name', $direction);
+        } else {
+            $query->orderBy('name', $direction);
+        }
+
+        $customers = $query->paginate(25);
 
         return response()->json($customers);
     }
@@ -247,6 +256,17 @@ class CustomerController extends Controller
         ]);
 
         $customer->update(['discount_pct' => $data['discount_pct']]);
+
+        return response()->json($customer->fresh());
+    }
+
+    public function setRates(Request $request, Customer $customer): JsonResponse
+    {
+        $data = $request->validate([
+            'default_callout_fee' => 'nullable|numeric|min:0',
+        ]);
+
+        $customer->update(['default_callout_fee' => $data['default_callout_fee'] ?? null]);
 
         return response()->json($customer->fresh());
     }

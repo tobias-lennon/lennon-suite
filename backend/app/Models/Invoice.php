@@ -27,6 +27,8 @@ class Invoice extends Model
         'payment_notes',
         'notes',
         'gnucash_exported_at',
+        'loyalty_hours_earned',
+        'loyalty_balance_after',
     ];
 
     protected function casts(): array
@@ -43,6 +45,8 @@ class Invoice extends Model
             'vat_amount'           => 'float',
             'total_due'            => 'float',
             'amount_paid'          => 'float',
+            'loyalty_hours_earned' => 'float',
+            'loyalty_balance_after'=> 'float',
         ];
     }
 

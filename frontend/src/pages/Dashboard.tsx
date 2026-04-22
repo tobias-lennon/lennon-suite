@@ -11,37 +11,45 @@ interface Stats {
   with_email: number
 }
 
-function StatCard({ label, value, sub, to }: { label: string; value: number | string; sub?: string; to?: string }) {
-  const inner = (
-    <>
-      <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">{label}</p>
-      <p className="text-3xl font-semibold text-[#0F3714]">{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
-    </>
-  )
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
-  if (to) {
-    return (
-      <Link to={to} className="bg-white rounded-xl p-6 border border-gray-100 hover:border-[#97B545] transition-colors block">
-        {inner}
-      </Link>
-    )
-  }
-
-  return (
-    <div className="bg-white rounded-xl p-6 border border-gray-100">
-      {inner}
-    </div>
-  )
+function now() {
+  const d = new Date()
+  return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`
 }
 
-function ComingSoonCard({ label }: { label: string }) {
-  return (
-    <div className="bg-white rounded-xl p-6 border border-gray-100 opacity-50">
-      <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">{label}</p>
-      <p className="text-sm text-gray-300 mt-2">Coming soon</p>
+interface StatCardProps {
+  label: string
+  value: number | string
+  sub?: string
+  to?: string
+  accent: string
+  textAccent?: string
+}
+
+function StatCard({ label, value, sub, to, accent, textAccent }: StatCardProps) {
+  const inner = (
+    <div className="relative overflow-hidden rounded-2xl bg-cream-card p-5 border border-black/5"
+         style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+      {/* Accent stripe */}
+      <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl" style={{ backgroundColor: accent }} />
+      <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: accent }}>
+        {label}
+      </p>
+      <p className="text-4xl font-bold leading-none" style={{ color: textAccent ?? '#0F3714' }}>
+        {value}
+      </p>
+      {sub && <p className="text-[11px] text-gray-400 mt-1.5">{sub}</p>}
     </div>
   )
+
+  if (to) return (
+    <Link to={to} className="block hover:scale-[1.02] transition-transform duration-150">
+      {inner}
+    </Link>
+  )
+  return inner
 }
 
 export default function Dashboard() {
@@ -58,60 +66,122 @@ export default function Dashboard() {
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const firstName = user?.name?.split(' ')[0] ?? 'there'
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-[#0F3714]">
-          {greeting}, {user?.name?.split(' ')[0]}.
+
+      {/* ── Hero card ──────────────────────────────────────────────── */}
+      <div
+        className="relative overflow-hidden rounded-3xl mb-6 p-6 md:p-8"
+        style={{
+          background: 'linear-gradient(135deg, #0F3714 0%, #1D5823 100%)',
+          boxShadow: '0 12px 40px rgba(15,55,20,0.35)',
+        }}
+      >
+        {/* Ghost "LL" watermark */}
+        <div
+          className="absolute right-4 bottom-0 leading-none font-black select-none pointer-events-none"
+          style={{ fontSize: '140px', color: 'rgba(255,255,255,0.04)' }}
+        >
+          LL
+        </div>
+
+        {/* Decorative dots */}
+        <div className="absolute top-4 right-4 flex gap-1.5 opacity-20">
+          {[0,1,2].map(i => (
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-brand-lime" />
+          ))}
+        </div>
+
+        <p className="text-white/40 text-xs font-medium tracking-widest uppercase mb-3">
+          {now()}
+        </p>
+        <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight">
+          {greeting},<br />
+          <span style={{ color: '#97B545' }}>{firstName}.</span>
         </h1>
-        <p className="text-gray-400 text-sm mt-1">Here's what's happening with Lennon Landscaping.</p>
+        <p className="text-white/40 text-sm mt-3">
+          Lennon Landscaping · Company Suite
+        </p>
       </div>
 
-      {/* Customer stats */}
-      <div className="mb-3">
+      {/* ── Customer stats ─────────────────────────────────────────── */}
+      <div className="mb-8">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Customers</h2>
-          <Link to="/customers" className="text-xs text-[#97B545] font-medium hover:underline">View all →</Link>
+          <h2 className="text-xs font-bold text-brand-dark/40 uppercase tracking-widest">Customers</h2>
+          <Link to="/customers" className="text-xs text-brand-lime font-semibold hover:underline">
+            View all →
+          </Link>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+        <div className="grid grid-cols-2 gap-3">
           {statsLoading ? (
             Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-xl p-6 border border-gray-100 flex items-center justify-center min-h-[96px]">
-                <Spinner className="w-5 h-5 text-[#97B545]" />
+              <div key={i} className="bg-cream-card rounded-2xl p-5 flex items-center justify-center min-h-[100px] border border-black/5">
+                <Spinner className="w-5 h-5 text-brand-lime" />
               </div>
             ))
           ) : (
             <>
-              <StatCard label="Total" value={stats?.total ?? '—'} to="/customers" />
-              <StatCard label="Residential" value={stats?.residential ?? '—'} to="/customers?type=residential" />
-              <StatCard label="Commercial" value={stats?.commercial ?? '—'} to="/customers?type=commercial" />
-              <StatCard label="With Email" value={stats?.with_email ?? '—'} sub="reachable by email" to="/customers?has_email=1" />
+              <StatCard label="Total"       value={stats?.total       ?? '—'} accent="#97B545" to="/customers" />
+              <StatCard label="Residential" value={stats?.residential ?? '—'} accent="#1D5823" to="/customers?type=residential" />
+              <StatCard label="Commercial"  value={stats?.commercial  ?? '—'} accent="#DDB01D" textAccent="#0F3714" to="/customers?type=commercial" />
+              <StatCard label="With Email"  value={stats?.with_email  ?? '—'} accent="#F4BE29" sub="reachable" to="/customers?has_email=1" />
             </>
           )}
         </div>
       </div>
 
-      {/* Jobs quick link */}
-      <div className="mt-8">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Jobs</h2>
-          <Link to="/jobs" className="text-xs text-[#97B545] font-medium hover:underline">View all →</Link>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Link to="/jobs?status=backlog" className="bg-white rounded-xl p-6 border border-gray-100 hover:border-[#97B545] transition-colors">
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">Backlog</p>
-            <p className="text-sm text-[#0F3714] font-medium">View →</p>
+      {/* ── Quick actions ──────────────────────────────────────────── */}
+      <div>
+        <h2 className="text-xs font-bold text-brand-dark/40 uppercase tracking-widest mb-3">Quick Actions</h2>
+        <div className="grid grid-cols-2 gap-3">
+
+          <Link
+            to="/jobs?status=scheduled"
+            className="relative overflow-hidden rounded-2xl p-5 border border-black/5 hover:scale-[1.02] transition-transform duration-150"
+            style={{ background: 'linear-gradient(135deg, #0F3714, #1D5823)', boxShadow: '0 4px 16px rgba(15,55,20,0.2)' }}
+          >
+            <div className="absolute right-3 bottom-2 text-5xl opacity-10 select-none">📋</div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1">Jobs</p>
+            <p className="text-white font-bold text-base">Scheduled</p>
+            <p className="text-brand-lime text-xs mt-1 font-medium">View all →</p>
           </Link>
-          <Link to="/jobs?status=scheduled" className="bg-white rounded-xl p-6 border border-gray-100 hover:border-[#97B545] transition-colors">
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">Scheduled</p>
-            <p className="text-sm text-[#0F3714] font-medium">View →</p>
+
+          <Link
+            to="/jobs/new"
+            className="relative overflow-hidden rounded-2xl p-5 border border-black/5 hover:scale-[1.02] transition-transform duration-150"
+            style={{ background: '#97B545', boxShadow: '0 4px 16px rgba(151,181,69,0.3)' }}
+          >
+            <div className="absolute right-3 bottom-2 text-5xl opacity-15 select-none">＋</div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-dark/50 mb-1">New</p>
+            <p className="text-brand-dark font-bold text-base">Add Job</p>
+            <p className="text-brand-dark/60 text-xs mt-1 font-medium">Create now →</p>
           </Link>
-          <Link to="/jobs/new" className="bg-white rounded-xl p-6 border border-gray-100 hover:border-[#97B545] transition-colors">
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">Add Job</p>
-            <p className="text-sm text-[#0F3714] font-medium">+ New →</p>
+
+          <Link
+            to="/invoices"
+            className="relative overflow-hidden rounded-2xl p-5 border border-black/5 hover:scale-[1.02] transition-transform duration-150"
+            style={{ background: '#DDB01D', boxShadow: '0 4px 16px rgba(221,176,29,0.3)' }}
+          >
+            <div className="absolute right-3 bottom-2 text-5xl opacity-15 select-none">💰</div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-dark/50 mb-1">Billing</p>
+            <p className="text-brand-dark font-bold text-base">Invoices</p>
+            <p className="text-brand-dark/60 text-xs mt-1 font-medium">View all →</p>
           </Link>
-          <ComingSoonCard label="Invoices" />
+
+          <Link
+            to="/leads"
+            className="relative overflow-hidden rounded-2xl p-5 border border-black/5 hover:scale-[1.02] transition-transform duration-150"
+            style={{ background: '#FDFAF5', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}
+          >
+            <div className="absolute right-3 bottom-2 text-5xl opacity-10 select-none">🎯</div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-dark/40 mb-1">Pipeline</p>
+            <p className="text-brand-dark font-bold text-base">Leads</p>
+            <p className="text-brand-lime text-xs mt-1 font-medium">View all →</p>
+          </Link>
+
         </div>
       </div>
     </div>

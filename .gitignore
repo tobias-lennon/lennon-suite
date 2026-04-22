@@ -4,3 +4,6 @@ Thumbs.db
 
 # Windows
 desktop.ini
+
+# Server credential files — never commit
+backend/.env.server

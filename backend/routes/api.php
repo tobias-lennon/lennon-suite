@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\AddressLookupController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\EmployeeController;
@@ -22,8 +22,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
 
-    Route::get('/address/autocomplete', [AddressLookupController::class, 'autocomplete']);
-    Route::get('/address/resolve', [AddressLookupController::class, 'resolve']);
+    // Profile
+    Route::patch('/users/me/password', [UserController::class, 'updatePassword']);
+    Route::post('/users/me/avatar',    [UserController::class, 'updateAvatar']);
+    Route::delete('/users/me/avatar',  [UserController::class, 'removeAvatar']);
 
     Route::get('/customers/stats', [CustomerController::class, 'stats']);
     Route::get('/customers/{customer}/history', [CustomerController::class, 'history']);
@@ -65,6 +67,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/employees', [EmployeeController::class, 'index']);
     Route::get('/rate-cards', [RateCardController::class, 'index']);
 
-    // Customer discount
+    // Customer discount and rates
     Route::patch('/customers/{customer}/discount', [CustomerController::class, 'setDiscount']);
+    Route::patch('/customers/{customer}/rates',    [CustomerController::class, 'setRates']);
 });

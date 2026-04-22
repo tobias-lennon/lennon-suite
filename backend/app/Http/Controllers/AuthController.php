@@ -30,10 +30,11 @@ class AuthController extends Controller
         return response()->json([
             'token' => $token,
             'user'  => [
-                'id'    => $user->id,
-                'name'  => $user->name,
-                'email' => $user->email,
-                'role'  => $user->role,
+                'id'     => $user->id,
+                'name'   => $user->name,
+                'email'  => $user->email,
+                'role'   => $user->role,
+                'avatar' => $user->avatar,
             ],
         ]);
     }
@@ -48,10 +49,11 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         return response()->json([
-            'id'    => $request->user()->id,
-            'name'  => $request->user()->name,
-            'email' => $request->user()->email,
-            'role'  => $request->user()->role,
+            'id'     => $request->user()->id,
+            'name'   => $request->user()->name,
+            'email'  => $request->user()->email,
+            'role'   => $request->user()->role,
+            'avatar' => $request->user()->avatar,
         ]);
     }
 }

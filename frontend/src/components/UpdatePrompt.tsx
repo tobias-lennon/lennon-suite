@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
 export default function UpdatePrompt() {
@@ -6,12 +7,24 @@ export default function UpdatePrompt() {
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_swUrl, r) {
-      // Check for updates every 60 minutes while the app is open
-      if (r) {
-        setInterval(() => r.update(), 60 * 60 * 1000)
-      }
+      if (!r) return
+      // Check immediately in case an update was already waiting
+      r.update()
+      // Then re-check every 30 minutes
+      setInterval(() => r.update(), 30 * 60 * 1000)
     },
   })
+
+  useEffect(() => {
+    // Also check when the tab regains focus (e.g. brother switches back to app)
+    function onVisible() {
+      if (document.visibilityState === 'visible') {
+        navigator.serviceWorker?.getRegistration().then(r => r?.update())
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
 
   if (!needRefresh) return null
 

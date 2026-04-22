@@ -20,6 +20,7 @@ class Customer extends Model
         'is_active',
         'rate_card_id',
         'discount_pct',
+        'default_callout_fee',
         'maintenance_hours_balance',
     ];
 
@@ -29,6 +30,7 @@ class Customer extends Model
             'is_active'                  => 'boolean',
             'rating'                     => 'integer',
             'discount_pct'               => 'float',
+            'default_callout_fee'        => 'float',
             'maintenance_hours_balance'  => 'float',
         ];
     }

@@ -8,6 +8,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 class InvoiceController extends Controller
 {
@@ -15,12 +16,12 @@ class InvoiceController extends Controller
     {
         $year = now()->year;
 
-        // Extract the highest numeric sequence across ALL invoices (global, never resets)
-        $maxSeq = Invoice::selectRaw("MAX(CAST(REGEXP_REPLACE(invoice_number, '[^0-9]', '') AS UNSIGNED)) as max_seq")
+        // Extract only the sequence segment (after the last dash) — avoids picking up year digits
+        $maxSeq = Invoice::selectRaw("MAX(CAST(SUBSTRING_INDEX(invoice_number, '-', -1) AS UNSIGNED)) as max_seq")
             ->value('max_seq');
 
-        // Start from at least 100 to pick up from existing business numbering
-        $nextNum = max((int) $maxSeq + 1, 100);
+        // Start from at least 103 to pick up from existing business numbering
+        $nextNum = max((int) $maxSeq + 1, 103);
 
         return "LL-{$year}-" . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
     }
@@ -61,17 +62,27 @@ class InvoiceController extends Controller
         $job = FieldJob::with([
             'customer',
             'workLogs' => fn($q) => $q->orderBy('date'),
-            'workLogs.entries',
+            'workLogs.entries.employee:id,name',
             'workLogs.materials',
         ])->findOrFail($data['field_job_id']);
 
-        // Build line items
+        // Build line items — callout fee is job-level, charged once per visit
+        $jobCalloutFee = (float) ($job->callout_fee ?? 0);
         $lineItems = [];
         foreach ($job->workLogs as $log) {
+            if ($jobCalloutFee > 0) {
+                $lineItems[] = [
+                    'type'        => 'callout',
+                    'description' => 'Callout fee — ' . $log->date->format('d/m/Y'),
+                    'quantity'    => 1,
+                    'unit_price'  => $jobCalloutFee,
+                    'amount'      => $jobCalloutFee,
+                ];
+            }
             foreach ($log->entries as $entry) {
                 $lineItems[] = [
                     'type'        => 'labour',
-                    'description' => 'Labour — ' . $log->date->format('d/m/Y'),
+                    'description' => $entry->employee->name . ' — ' . $log->date->format('d/m/Y'),
                     'quantity'    => (float) $entry->billable_hours,
                     'unit_price'  => (float) $entry->rate_per_hour,
                     'amount'      => (float) $entry->amount_charged,
@@ -103,25 +114,42 @@ class InvoiceController extends Controller
         $vatAmount      = round($vatBase * ($vatRate / 100), 2);
         $totalDue       = round($vatBase + $vatAmount, 2);
 
-        $invoice = Invoice::create([
-            'invoice_number'  => $this->generateInvoiceNumber(),
-            'field_job_id'    => $job->id,
-            'customer_id'     => $job->customer_id,
-            'issued_date'     => now()->toDateString(),
-            'due_date'        => now()->addDays($data['due_days'] ?? 30)->toDateString(),
-            'status'          => 'draft',
-            'subtotal'        => $subtotal,
-            'discount_pct'    => $discountPct,
-            'discount_amount' => $discountAmount,
-            'vat_rate'        => $vatRate,
-            'vat_amount'      => $vatAmount,
-            'total_due'       => $totalDue,
-            'notes'           => $data['notes'] ?? null,
-        ]);
-
-        foreach ($lineItems as $item) {
-            $invoice->lineItems()->create($item);
+        // Snapshot loyalty data for maintenance jobs
+        $loyaltyHoursEarned  = null;
+        $loyaltyBalanceAfter = null;
+        if ($job->type === 'maintenance' && $job->customer) {
+            $loyaltyHoursEarned  = round(
+                $job->workLogs->flatMap->entries->sum(fn($e) => (float) $e->billable_hours),
+                2
+            );
+            $loyaltyBalanceAfter = round((float) $job->customer->maintenance_hours_balance, 2);
         }
+
+        $invoice = DB::transaction(function () use ($job, $data, $lineItems, $subtotal, $discountPct, $discountAmount, $vatRate, $vatAmount, $totalDue, $loyaltyHoursEarned, $loyaltyBalanceAfter) {
+            $invoice = Invoice::create([
+                'invoice_number'       => $this->generateInvoiceNumber(),
+                'field_job_id'         => $job->id,
+                'customer_id'          => $job->customer_id,
+                'issued_date'          => now()->toDateString(),
+                'due_date'             => now()->addDays($data['due_days'] ?? 30)->toDateString(),
+                'status'               => 'draft',
+                'subtotal'             => $subtotal,
+                'discount_pct'         => $discountPct,
+                'discount_amount'      => $discountAmount,
+                'vat_rate'             => $vatRate,
+                'vat_amount'           => $vatAmount,
+                'total_due'            => $totalDue,
+                'notes'                => $data['notes'] ?? null,
+                'loyalty_hours_earned' => $loyaltyHoursEarned,
+                'loyalty_balance_after'=> $loyaltyBalanceAfter,
+            ]);
+
+            foreach ($lineItems as $item) {
+                $invoice->lineItems()->create($item);
+            }
+
+            return $invoice;
+        });
 
         return response()->json($invoice->load(['lineItems', 'customer', 'job']), 201);
     }

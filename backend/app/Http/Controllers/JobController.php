@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\FieldJob;
 use App\Models\Invoice;
-use App\Services\RateCalculationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -43,8 +42,9 @@ class JobController extends Controller
         match ($sort) {
             'scheduled_date_asc'  => $query->orderByRaw('scheduled_date IS NULL, scheduled_date ASC'),
             'scheduled_date_desc' => $query->orderByRaw('scheduled_date IS NULL, scheduled_date DESC'),
+            'due_by_asc'          => $query->orderByRaw('due_by IS NULL, due_by ASC'),
             'priority_desc'       => $query->orderByRaw("FIELD(priority, 'urgent', 'high', 'normal')"),
-            default               => $query->orderBy('created_at', 'desc'),
+            default               => $query->orderBy('updated_at', 'desc'),
         };
 
         return response()->json($query->paginate(25));
@@ -58,15 +58,23 @@ class JobController extends Controller
             'title'             => 'required|string|max:255',
             'description'       => 'nullable|string',
             'type'              => 'required|in:standard,maintenance,site_visit,internal',
-            'has_power_tools'   => 'boolean',
-            'has_waste_disposal' => 'boolean',
             'status'            => 'in:backlog,scheduled,in_progress,complete',
             'weather_req'       => 'in:any,dry_preferred,dry_only',
             'est_duration'      => 'nullable|in:quick,half_day,full_day,multi_day',
             'priority'          => 'in:normal,high,urgent',
             'scheduled_date'    => 'nullable|date',
+            'due_by'            => 'nullable|date',
             'notes'             => 'nullable|string',
+            'callout_fee'       => 'nullable|numeric|min:0',
         ]);
+
+        // Auto-populate callout fee from customer default if not explicitly set
+        if (!isset($data['callout_fee']) && isset($data['customer_id'])) {
+            $customer = \App\Models\Customer::find($data['customer_id']);
+            if ($customer?->default_callout_fee > 0) {
+                $data['callout_fee'] = $customer->default_callout_fee;
+            }
+        }
 
         $job = FieldJob::create($data);
         $job->load('customer:id,name');
@@ -110,14 +118,14 @@ class JobController extends Controller
             'title'              => 'sometimes|string|max:255',
             'description'        => 'nullable|string',
             'type'               => 'sometimes|in:standard,maintenance,site_visit,internal',
-            'has_power_tools'    => 'boolean',
-            'has_waste_disposal' => 'boolean',
             'status'             => 'sometimes|in:backlog,scheduled,in_progress,complete',
             'weather_req'        => 'sometimes|in:any,dry_preferred,dry_only',
             'est_duration'       => 'nullable|in:quick,half_day,full_day,multi_day',
             'priority'           => 'sometimes|in:normal,high,urgent',
             'scheduled_date'     => 'nullable|date',
+            'due_by'             => 'nullable|date',
             'notes'              => 'nullable|string',
+            'callout_fee'        => 'nullable|numeric|min:0',
         ]);
 
         $job->update($data);
@@ -161,15 +169,16 @@ class JobController extends Controller
             }
         }
 
-        $rateService = app(RateCalculationService::class);
-        $calloutFee  = $rateService->calculateCalloutFee($job, $totalHours);
+        // Callout fee is job-level and charged once per visit
+        $visitCount = $job->workLogs->count();
+        $calloutFee = round((float) ($job->callout_fee ?? 0) * $visitCount, 2);
 
         return [
             'total_hours'          => round($totalHours, 2),
             'total_labour_charged' => round($totalCharged, 2),
             'total_labour_cost'    => round($totalCost, 2),
             'total_materials'      => round($totalMaterials, 2),
-            'callout_fee'          => round($calloutFee, 2),
+            'callout_fee'          => $calloutFee,
             'total_charged'        => round($totalCharged + $totalMaterials + $calloutFee, 2),
             'margin'               => round($totalCharged - $totalCost, 2),
         ];

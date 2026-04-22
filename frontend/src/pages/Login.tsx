@@ -23,8 +23,8 @@ export default function Login() {
     } catch (err: any) {
       if (err.code === 'ERR_NETWORK' || err.code === 'ECONNREFUSED') {
         setError('Cannot reach the server. Is the API running on port 8000?')
-      } else if (err.response?.status === 422) {
-        setError('Incorrect email or password.')
+      } else if (err.response?.status === 401 || err.response?.status === 422) {
+        setError('Invalid credentials.')
       } else if (err.response?.status === 429) {
         setError('Too many attempts. Please wait a minute and try again.')
       } else {
@@ -98,7 +98,7 @@ export default function Login() {
             </div>
 
             {error && (
-              <p className="text-sm text-red-500 text-center">{error}</p>
+              <p className="text-sm text-danger text-center">{error}</p>
             )}
 
             <button

@@ -3,10 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../../lib/api'
 import { toTitleCase } from '../../lib/formatters'
 import Spinner from '../../components/Spinner'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 interface LineItem {
   id: number
-  type: 'labour' | 'material'
+  type: 'labour' | 'material' | 'callout'
   description: string
   quantity: number
   unit_price: number
@@ -30,6 +31,8 @@ interface Invoice {
   paid_at: string | null
   payment_notes: string | null
   notes: string | null
+  loyalty_hours_earned: number | null
+  loyalty_balance_after: number | null
   customer: {
     id: number
     name: string
@@ -48,9 +51,9 @@ interface Invoice {
 }
 
 const STATUS_COLOURS: Record<string, string> = {
-  draft: 'bg-amber-100 text-amber-700',
-  sent:  'bg-blue-100 text-blue-700',
-  paid:  'bg-green-100 text-green-700',
+  draft: 'badge-draft',
+  sent:  'badge-sent',
+  paid:  'badge-paid',
 }
 
 function statusLabel(s: string) {
@@ -86,7 +89,7 @@ export default function InvoiceDetail() {
   const [downloading, setDownloading] = useState(false)
   const [downloadingReceipt, setDownloadingReceipt] = useState(false)
   const [statusUpdating, setStatusUpdating] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   // Payment form
   const [showPaymentForm, setShowPaymentForm] = useState(false)
@@ -183,27 +186,34 @@ export default function InvoiceDetail() {
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto">
 
-      {/* Back */}
-      <button onClick={() => navigate(-1)} className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 mb-6">
-        ← Back
-      </button>
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        title="Delete invoice?"
+        message={`Delete ${invoice.invoice_number}? This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={async () => { setShowDeleteDialog(false); await deleteInvoice() }}
+        onCancel={() => setShowDeleteDialog(false)}
+      />
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-[#0F3714]">{invoice.invoice_number}</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            <Link to={`/customers/${invoice.customer.id}`} className="hover:underline" style={{ color: '#97B545' }}>
-              {toTitleCase(invoice.customer.name)}
-            </Link>
-            <span className="text-gray-300 mx-1">·</span>
-            <Link to={`/jobs/${invoice.job.id}`} className="hover:underline text-gray-500">
-              {invoice.job.title}
-            </Link>
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLOURS[invoice.status] ?? ''}`}>
+      <div className="mb-6">
+        <button onClick={() => navigate(-1)} className="text-sm transition-colors" style={{ color: 'rgba(15,55,20,0.45)' }}>
+          ← Back
+        </button>
+        <div className="flex items-start justify-between gap-4 mt-1">
+          <div>
+            <h1 className="text-2xl font-bold text-brand-dark">{invoice.invoice_number}</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              <Link to={`/customers/${invoice.customer.id}`} className="hover:underline" style={{ color: '#97B545' }}>
+                {toTitleCase(invoice.customer.name)}
+              </Link>
+              <span className="text-gray-300 mx-1">·</span>
+              <Link to={`/jobs/${invoice.job.id}`} className="hover:underline text-gray-500">
+                {invoice.job.title}
+              </Link>
+            </p>
+          </div>
+          <span className={`mt-1 shrink-0 badge ${STATUS_COLOURS[invoice.status] ?? 'badge-draft'}`}>
             {statusLabel(invoice.status)}
           </span>
         </div>
@@ -214,7 +224,7 @@ export default function InvoiceDetail() {
         <button
           onClick={handleDownloadPdf}
           disabled={downloading}
-          className="min-w-[152px] flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+          className="min-w-[152px] flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50"
         >
           {downloading ? (
             <svg className="animate-spin w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24">
@@ -233,7 +243,7 @@ export default function InvoiceDetail() {
           <button
             onClick={handleDownloadReceipt}
             disabled={downloadingReceipt}
-            className="min-w-[152px] flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+            className="min-w-[152px] flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50"
           >
             {downloadingReceipt ? (
               <svg className="animate-spin w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24">
@@ -277,14 +287,15 @@ export default function InvoiceDetail() {
 
       {/* Send flow hint — only when not yet sent */}
       {invoice.status === 'draft' && (
-        <div className="flex items-center gap-3 mb-6 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-          <div className="text-sm text-amber-800">
+        <div className="flex items-center gap-3 mb-6 p-3 rounded-lg" style={{ background: 'rgba(15,55,20,0.05)', border: '1px solid rgba(15,55,20,0.12)' }}>
+          <div className="text-sm" style={{ color: '#0F3714' }}>
             <span className="font-medium">Next step:</span> Download the invoice above, send it to the customer, then come back and record payment when received.
           </div>
           <button
             disabled={statusUpdating}
             onClick={() => updateStatus('sent')}
-            className="shrink-0 min-w-[100px] flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+            className="shrink-0 min-w-[100px] flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-lg disabled:opacity-50"
+            style={{ background: 'rgba(151,181,69,0.18)', color: '#0F3714' }}
           >
             {statusUpdating ? (
               <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
@@ -298,7 +309,7 @@ export default function InvoiceDetail() {
 
       {/* Payment recording form */}
       {showPaymentForm && (
-        <div className="bg-[#f9fdf4] border border-[#c8e08a] rounded-xl p-5 mb-6">
+        <div className="bg-[#f9fdf4] border border-[#c8e08a] rounded-lg p-5 mb-6">
           <h3 className="text-sm font-semibold text-[#0F3714] mb-4">Record Payment</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
@@ -313,7 +324,7 @@ export default function InvoiceDetail() {
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
               />
               {paymentErrors.amount_paid && (
-                <p className="text-xs text-red-500 mt-1">{paymentErrors.amount_paid}</p>
+                <p className="text-xs text-danger mt-1">{paymentErrors.amount_paid}</p>
               )}
               {/* Variance hint */}
               {paymentForm.amount_paid && !isNaN(parseFloat(paymentForm.amount_paid)) && (
@@ -321,7 +332,7 @@ export default function InvoiceDetail() {
                   const diff = parseFloat(paymentForm.amount_paid) - invoice.total_due
                   if (Math.abs(diff) < 0.005) return null
                   return (
-                    <p className={`text-xs mt-1 ${diff > 0 ? 'text-amber-600' : 'text-red-500'}`}>
+                    <p className={`text-xs mt-1 ${diff > 0 ? '' : 'text-danger'}`} style={diff > 0 ? { color: '#DDB01D' } : {}}>
                       {diff > 0 ? `Overpaid by €${diff.toFixed(2)}` : `Underpaid by €${Math.abs(diff).toFixed(2)}`}
                     </p>
                   )
@@ -367,10 +378,11 @@ export default function InvoiceDetail() {
             <button
               onClick={recordPayment}
               disabled={isRecordingPayment}
-              className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50"
               style={{ backgroundColor: '#0F3714' }}
             >
-              {isRecordingPayment ? 'Saving…' : 'Save Payment'}
+              {isRecordingPayment && <Spinner className="w-4 h-4 text-white" />}
+              Save Payment
             </button>
             <button
               onClick={() => setShowPaymentForm(false)}
@@ -384,16 +396,16 @@ export default function InvoiceDetail() {
 
       {/* Payment confirmed banner */}
       {invoice.status === 'paid' && invoice.amount_paid !== null && (
-        <div className={`rounded-xl border p-4 mb-6 ${
-          isOverpaid
-            ? 'bg-amber-50 border-amber-200'
-            : isUnderpaid
-              ? 'bg-red-50 border-red-200'
-              : 'bg-green-50 border-green-200'
-        }`}>
+        <div
+          className="rounded-lg border p-4 mb-6"
+          style={{
+            background: isOverpaid ? 'rgba(221,176,29,0.08)' : isUnderpaid ? 'rgba(15,55,20,0.05)' : 'rgba(151,181,69,0.1)',
+            borderColor: isOverpaid ? 'rgba(221,176,29,0.35)' : isUnderpaid ? 'rgba(15,55,20,0.2)' : 'rgba(151,181,69,0.35)',
+          }}
+        >
           <div className="flex items-start justify-between">
             <div>
-              <p className={`text-sm font-semibold ${isOverpaid ? 'text-amber-800' : isUnderpaid ? 'text-red-800' : 'text-green-800'}`}>
+              <p className="text-sm font-semibold" style={{ color: '#0F3714' }}>
                 {isOverpaid ? 'Payment received (overpaid)' : isUnderpaid ? 'Partial payment received' : 'Payment confirmed'}
               </p>
               <p className="text-sm text-gray-600 mt-0.5">
@@ -401,10 +413,10 @@ export default function InvoiceDetail() {
                 {invoice.paid_at && ` · ${formatDate(invoice.paid_at)}`}
               </p>
               {isOverpaid && (
-                <p className="text-xs text-amber-700 mt-1">Customer overpaid by {fmt(variance)}</p>
+                <p className="text-xs mt-1" style={{ color: '#DDB01D' }}>Customer overpaid by {fmt(variance)}</p>
               )}
               {isUnderpaid && (
-                <p className="text-xs text-red-700 mt-1">Outstanding balance: {fmt(Math.abs(variance))}</p>
+                <p className="text-xs font-medium mt-1" style={{ color: '#0F3714' }}>Outstanding balance: {fmt(Math.abs(variance))}</p>
               )}
               {invoice.payment_notes && (
                 <p className="text-xs text-gray-400 mt-1">{invoice.payment_notes}</p>
@@ -415,7 +427,7 @@ export default function InvoiceDetail() {
       )}
 
       {/* Invoice info */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-5">
+      <div className="bg-white rounded-lg border border-gray-100 p-5 mb-5">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
           <div>
             <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Bill To</p>
@@ -448,78 +460,155 @@ export default function InvoiceDetail() {
         )}
       </div>
 
-      {/* Line items */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden mb-5">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-gray-400 uppercase tracking-wide border-b border-gray-100">
-              <th className="text-left px-4 py-3 font-medium">Description</th>
-              <th className="text-right px-4 py-3 font-medium hidden md:table-cell">Qty</th>
-              <th className="text-right px-4 py-3 font-medium hidden md:table-cell">Unit Price</th>
-              <th className="text-right px-4 py-3 font-medium">Amount</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {invoice.line_items.map(item => (
-              <tr key={item.id} className={item.type === 'material' ? 'bg-gray-50/50' : ''}>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${
-                      item.type === 'labour'
-                        ? 'bg-[#97B545]/15 text-[#5a7020]'
-                        : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {item.type === 'labour' ? 'Labour' : 'Material'}
-                    </span>
-                    <span className="text-gray-700">{item.description}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-right text-gray-400 hidden md:table-cell">{item.quantity}</td>
-                <td className="px-4 py-3 text-right text-gray-400 hidden md:table-cell">{fmt(item.unit_price)}</td>
-                <td className="px-4 py-3 text-right font-medium text-gray-900">{fmt(item.amount)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Line items — grouped by visit date */}
+      {(() => {
+        // Parse date from description: "Labour — dd/mm/yyyy" or "Callout fee — dd/mm/yyyy"
+        function extractDate(desc: string): string | null {
+          const m = desc.match(/(\d{2}\/\d{2}\/\d{4})$/)
+          return m ? m[1] : null
+        }
+        function parseDate(ddmmyyyy: string): Date {
+          const [d, mo, y] = ddmmyyyy.split('/')
+          return new Date(Number(y), Number(mo) - 1, Number(d))
+        }
+        function fmtVisitDate(ddmmyyyy: string): string {
+          return parseDate(ddmmyyyy).toLocaleDateString('en-IE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+        }
 
-        {/* Totals block */}
-        <div className="border-t border-gray-100 px-4 py-4 space-y-1.5">
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>Subtotal</span>
-            <span>{fmt(invoice.subtotal)}</span>
-          </div>
-          {invoice.discount_amount > 0 && (
-            <div className="flex justify-between text-sm text-red-600">
-              <span>Discount ({invoice.discount_pct}%)</span>
-              <span>−{fmt(invoice.discount_amount)}</span>
+        // Build ordered groups
+        const orderedDates: string[] = []
+        const groups = new Map<string, LineItem[]>()
+        const materials: LineItem[] = []
+
+        invoice.line_items.forEach(item => {
+          const d = extractDate(item.description)
+          if (d) {
+            if (!groups.has(d)) { groups.set(d, []); orderedDates.push(d) }
+            groups.get(d)!.push(item)
+          } else {
+            materials.push(item)
+          }
+        })
+
+        // Strip the date from descriptions for display (we show it in the group header)
+        function cleanDesc(desc: string): string {
+          return desc.replace(/\s+—\s+\d{2}\/\d{2}\/\d{4}$/, '').trim()
+        }
+
+        function typeBadge(type: string) {
+          const label = type === 'labour' ? 'Labour' : type === 'callout' ? 'Callout' : 'Material'
+          const mod   = type === 'labour' ? 'badge-standard' : type === 'callout' ? 'badge-scheduled' : 'badge-high'
+          return <span className={`badge ${mod}`}>{label}</span>
+        }
+
+        return (
+          <div className="bg-white rounded-lg border border-gray-100 overflow-hidden mb-5">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                  <th className="text-left px-4 py-3 font-medium">Description</th>
+                  <th className="text-right px-4 py-3 font-medium hidden md:table-cell">Hrs / Qty</th>
+                  <th className="text-right px-4 py-3 font-medium">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orderedDates.map((date, visitIdx) => {
+                  const items = groups.get(date)!
+                  const labourItems = items.filter(i => i.type === 'labour')
+                  const totalHours = labourItems.reduce((s, i) => s + i.quantity, 0)
+                  const peopleCount = labourItems.length
+
+                  return (
+                    <>
+                      {/* Visit date header row */}
+                      <tr key={`h-${date}`} className="border-t border-gray-100">
+                        <td colSpan={3} className="px-4 py-2 bg-[#f5f8f0]">
+                          <span className="text-xs font-semibold text-[#0F3714]">
+                            Visit {visitIdx + 1} — {fmtVisitDate(date)}
+                          </span>
+                          {peopleCount > 0 && (
+                            <span className="ml-2 text-xs text-gray-400">
+                              {peopleCount === 1 ? '1 person' : `${peopleCount} people`}
+                              {totalHours > 0 && ` · ${totalHours.toFixed(2)}h total`}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                      {/* Items in this visit */}
+                      {items.map(item => (
+                        <tr key={item.id} className="border-t border-gray-50">
+                          <td className="px-4 py-2.5 pl-6">
+                            <div className="flex items-center gap-2">
+                              {typeBadge(item.type)}
+                              <span className="text-gray-700">{cleanDesc(item.description)}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-gray-400 hidden md:table-cell text-xs">
+                            {item.type === 'labour' ? `${item.quantity.toFixed(2)}h` : '—'}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-medium text-gray-900">{fmt(item.amount)}</td>
+                        </tr>
+                      ))}
+                    </>
+                  )
+                })}
+                {/* Materials with no date (not tied to a specific visit) */}
+                {materials.length > 0 && (
+                  <>
+                    <tr className="border-t border-gray-100">
+                      <td colSpan={3} className="px-4 py-2" style={{ background: 'rgba(221,176,29,0.08)' }}>
+                        <span className="text-xs font-semibold" style={{ color: '#0F3714' }}>Materials</span>
+                      </td>
+                    </tr>
+                    {materials.map(item => (
+                      <tr key={item.id} className="border-t border-gray-50">
+                        <td className="px-4 py-2.5 pl-6">
+                          <div className="flex items-center gap-2">
+                            {typeBadge(item.type)}
+                            <span className="text-gray-700">{item.description}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-gray-400 hidden md:table-cell text-xs">
+                          {item.quantity} {/* qty for materials */}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-medium text-gray-900">{fmt(item.amount)}</td>
+                      </tr>
+                    ))}
+                  </>
+                )}
+              </tbody>
+            </table>
+
+            {/* Totals block */}
+            <div className="border-t border-gray-100 px-4 py-4 space-y-1.5">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Subtotal</span>
+                <span>{fmt(invoice.subtotal)}</span>
+              </div>
+              {invoice.discount_amount > 0 && (
+                <div className="flex justify-between text-sm text-danger">
+                  <span>Discount ({invoice.discount_pct}%)</span>
+                  <span>−{fmt(invoice.discount_amount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>VAT ({invoice.vat_rate}%)</span>
+                <span>{fmt(invoice.vat_amount)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold text-[#0F3714] border-t border-gray-100 pt-2 mt-1">
+                <span>Total Due</span>
+                <span className="text-base" style={{ color: '#97B545' }}>{fmt(invoice.total_due)}</span>
+              </div>
             </div>
-          )}
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>VAT ({invoice.vat_rate}%)</span>
-            <span>{fmt(invoice.vat_amount)}</span>
           </div>
-          <div className="flex justify-between text-sm font-semibold text-[#0F3714] border-t border-gray-100 pt-2 mt-1">
-            <span>Total Due</span>
-            <span className="text-base" style={{ color: '#97B545' }}>{fmt(invoice.total_due)}</span>
-          </div>
-        </div>
-      </div>
+        )
+      })()}
 
       {/* Danger zone */}
       <div className="border-t border-gray-200 pt-6">
-        {!confirmDelete ? (
-          <button onClick={() => setConfirmDelete(true)} className="text-sm text-red-400 hover:text-red-600">
-            Delete invoice
-          </button>
-        ) : (
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600">Delete this invoice?</span>
-            <button onClick={deleteInvoice} className="text-sm font-medium text-red-600 hover:text-red-800">
-              Yes, delete
-            </button>
-            <button onClick={() => setConfirmDelete(false)} className="text-sm text-gray-500">Cancel</button>
-          </div>
-        )}
+        <button onClick={() => setShowDeleteDialog(true)} className="text-sm text-danger">
+          Delete invoice
+        </button>
       </div>
 
     </div>

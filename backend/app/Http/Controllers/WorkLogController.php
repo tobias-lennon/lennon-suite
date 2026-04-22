@@ -28,15 +28,18 @@ class WorkLogController extends Controller
     public function store(Request $request, FieldJob $job): JsonResponse
     {
         $data = $request->validate([
-            'date'                      => 'required|date',
-            'notes'                     => 'nullable|string',
-            'entries'                   => 'array',
-            'entries.*.employee_id'     => 'required|exists:employees,id',
-            'entries.*.start_time'      => 'nullable|date_format:H:i',
-            'entries.*.end_time'        => 'nullable|date_format:H:i',
-            'entries.*.break_minutes'   => 'integer|min:0',
-            'entries.*.billable_hours'  => 'required|numeric|min:0',
-            'materials'                 => 'array',
+            'date'                          => 'required|date',
+            'notes'                         => 'nullable|string',
+            'callout_fee'                   => 'nullable|numeric|min:0',
+            'has_waste_disposal'            => 'boolean',
+            'entries'                       => 'array',
+            'entries.*.employee_id'         => 'required|exists:employees,id',
+            'entries.*.start_time'          => 'nullable|date_format:H:i',
+            'entries.*.end_time'            => 'nullable|date_format:H:i',
+            'entries.*.break_minutes'       => 'integer|min:0',
+            'entries.*.billable_hours'      => 'required|numeric|min:0',
+            'entries.*.has_power_tools'     => 'boolean',
+            'materials'                     => 'array',
             'materials.*.description'   => 'required|string|max:255',
             'materials.*.qty'           => 'nullable|numeric|min:0',
             'materials.*.unit'          => 'nullable|string|max:50',
@@ -46,35 +49,40 @@ class WorkLogController extends Controller
         ]);
 
         $log = $job->workLogs()->create([
-            'date'  => $data['date'],
-            'notes' => $data['notes'] ?? null,
+            'date'               => $data['date'],
+            'notes'              => $data['notes'] ?? null,
+            'callout_fee'        => $data['callout_fee'] ?? null,
+            'has_waste_disposal' => $data['has_waste_disposal'] ?? false,
         ]);
 
-        $isInternal = $job->type === 'internal';
-        $customer   = $isInternal ? null : $job->customer()->with('rateCard')->first();
-        $rate       = $isInternal ? 0 : $this->rateService->calculateRate($job, $customer);
+        $isInternal       = $job->type === 'internal';
+        $customer         = $isInternal ? null : $job->customer()->with('rateCard')->first();
+        $hasWasteDisposal = (bool) $log->has_waste_disposal;
 
         $totalMaintenanceHours = 0;
 
         foreach ($data['entries'] ?? [] as $entryData) {
             $employee      = Employee::find($entryData['employee_id']);
+            $hasPowerTools = (bool) ($entryData['has_power_tools'] ?? false);
+            $rate          = $isInternal ? 0 : $this->rateService->calculateRate($job, $customer, $hasPowerTools, $hasWasteDisposal);
             $hours         = (float) $entryData['billable_hours'];
             $amountCharged = $isInternal ? 0 : round($hours * $rate, 2);
             $amountPaid    = round($hours * $employee->pay_rate, 2);
 
             WorkLogEntry::create([
-                'work_log_id'    => $log->id,
-                'employee_id'    => $entryData['employee_id'],
-                'start_time'     => $entryData['start_time'] ?? null,
-                'end_time'       => $entryData['end_time'] ?? null,
-                'break_minutes'  => $entryData['break_minutes'] ?? 0,
-                'billable_hours' => $hours,
-                'rate_per_hour'  => $rate,
-                'pay_rate'       => $employee->pay_rate,
-                'discount_pct'   => $customer?->discount_pct ?? 0,
-                'amount_charged' => $amountCharged,
-                'amount_paid'    => $amountPaid,
-                'margin'         => round($amountCharged - $amountPaid, 2),
+                'work_log_id'     => $log->id,
+                'employee_id'     => $entryData['employee_id'],
+                'start_time'      => $entryData['start_time'] ?? null,
+                'end_time'        => $entryData['end_time'] ?? null,
+                'break_minutes'   => $entryData['break_minutes'] ?? 0,
+                'has_power_tools' => $hasPowerTools,
+                'billable_hours'  => $hours,
+                'rate_per_hour'   => $rate,
+                'pay_rate'        => $employee->pay_rate,
+                'discount_pct'    => $customer?->discount_pct ?? 0,
+                'amount_charged'  => $amountCharged,
+                'amount_paid'     => $amountPaid,
+                'margin'          => round($amountCharged - $amountPaid, 2),
             ]);
 
             if ($job->type === 'maintenance') {
@@ -117,8 +125,10 @@ class WorkLogController extends Controller
         abort_if($log->field_job_id !== $job->id, 404);
 
         $data = $request->validate([
-            'date'  => 'sometimes|date',
-            'notes' => 'nullable|string',
+            'date'               => 'sometimes|date',
+            'notes'              => 'nullable|string',
+            'callout_fee'        => 'nullable|numeric|min:0',
+            'has_waste_disposal' => 'boolean',
         ]);
 
         $log->update($data);

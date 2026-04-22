@@ -15,22 +15,22 @@ class FieldJob extends Model
         'title',
         'description',
         'type',
-        'has_power_tools',
-        'has_waste_disposal',
         'status',
         'weather_req',
         'est_duration',
         'priority',
         'scheduled_date',
+        'due_by',
         'notes',
+        'callout_fee',
     ];
 
     protected function casts(): array
     {
         return [
-            'has_power_tools'   => 'boolean',
-            'has_waste_disposal' => 'boolean',
-            'scheduled_date'    => 'date',
+            'scheduled_date' => 'date',
+            'due_by'         => 'date',
+            'callout_fee'        => 'float',
         ];
     }
 

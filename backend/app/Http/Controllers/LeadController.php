@@ -34,12 +34,14 @@ class LeadController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name'   => 'required|string|max:200',
-            'phone'  => 'nullable|string|max:30',
-            'email'  => 'nullable|email:rfc|max:255',
-            'source' => 'nullable|string|in:word_of_mouth,google,instagram,referral,other',
-            'status' => 'nullable|string|in:new,contacted,quoted,won,lost',
-            'notes'  => 'nullable|string|max:5000',
+            'name'                => 'required|string|max:200',
+            'phone'               => 'nullable|string|max:30',
+            'email'               => 'nullable|email:rfc|max:255',
+            'eircode'             => 'nullable|string|max:10',
+            'source'              => 'nullable|string|in:word_of_mouth,google,instagram,referral,other',
+            'status'              => 'nullable|string|in:new,contacted,quoted,site_visited,won,lost',
+            'requires_site_visit' => 'nullable|boolean',
+            'notes'               => 'nullable|string|max:5000',
         ]);
 
         $lead = Lead::create($data);
@@ -55,12 +57,14 @@ class LeadController extends Controller
     public function update(Request $request, Lead $lead): JsonResponse
     {
         $data = $request->validate([
-            'name'   => 'sometimes|required|string|max:200',
-            'phone'  => 'nullable|string|max:30',
-            'email'  => 'nullable|email:rfc|max:255',
-            'source' => 'nullable|string|in:word_of_mouth,google,instagram,referral,other',
-            'status' => 'nullable|string|in:new,contacted,quoted,won,lost',
-            'notes'  => 'nullable|string|max:5000',
+            'name'                => 'sometimes|required|string|max:200',
+            'phone'               => 'nullable|string|max:30',
+            'email'               => 'nullable|email:rfc|max:255',
+            'eircode'             => 'nullable|string|max:10',
+            'source'              => 'nullable|string|in:word_of_mouth,google,instagram,referral,other',
+            'status'              => 'nullable|string|in:new,contacted,quoted,site_visited,won,lost',
+            'requires_site_visit' => 'nullable|boolean',
+            'notes'               => 'nullable|string|max:5000',
         ]);
 
         $lead->update($data);

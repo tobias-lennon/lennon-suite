@@ -14,6 +14,7 @@ interface Customer {
   notes: string | null
   rating: number | null
   discount_pct: number
+  default_callout_fee: number | null
   maintenance_hours_balance: number
   address: {
     address_line_1: string | null
@@ -48,15 +49,15 @@ interface JobHistory {
 }
 
 function FieldLabel({ children }: { children: ReactNode }) {
-  return <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">{children}</p>
+  return <p className="section-label">{children}</p>
 }
 
 function typeStyle(type: string) {
   switch (type) {
-    case 'maintenance': return 'bg-blue-100 text-blue-700'
-    case 'site_visit':  return 'bg-purple-100 text-purple-700'
-    case 'internal':    return 'bg-gray-100 text-gray-600'
-    default:            return 'bg-[#97B545]/15 text-[#5a7020]'
+    case 'maintenance': return 'badge-maintenance'
+    case 'site_visit':  return 'badge-site-visit'
+    case 'internal':    return 'badge-internal'
+    default:            return 'badge-standard'
   }
 }
 
@@ -71,10 +72,10 @@ function typeLabel(type: string) {
 
 function jobStatusStyle(status: string) {
   switch (status) {
-    case 'complete':    return 'bg-green-100 text-green-700'
-    case 'in_progress': return 'bg-amber-100 text-amber-700'
-    case 'scheduled':   return 'bg-blue-100 text-blue-700'
-    default:            return 'bg-gray-100 text-gray-500'
+    case 'complete':    return 'badge-complete'
+    case 'in_progress': return 'badge-in-progress'
+    case 'scheduled':   return 'badge-scheduled'
+    default:            return 'badge-backlog'
   }
 }
 
@@ -102,6 +103,9 @@ export default function CustomerDetail() {
   const [editingDiscount, setEditingDiscount] = useState(false)
   const [discountInput, setDiscountInput] = useState('')
   const [savingDiscount, setSavingDiscount] = useState(false)
+  const [editingCallout, setEditingCallout] = useState(false)
+  const [calloutInput, setCalloutInput] = useState('')
+  const [savingCallout, setSavingCallout] = useState(false)
 
   useEffect(() => {
     api.get(`/customers/${id}`)
@@ -129,6 +133,16 @@ export default function CustomerDetail() {
     setSavingDiscount(false)
   }
 
+  async function saveCallout() {
+    if (!customer) return
+    setSavingCallout(true)
+    const fee = calloutInput.trim() === '' ? null : parseFloat(calloutInput)
+    const res = await api.patch(`/customers/${id}/rates`, { default_callout_fee: fee })
+    setCustomer(prev => prev ? { ...prev, default_callout_fee: res.data.default_callout_fee } : prev)
+    setEditingCallout(false)
+    setSavingCallout(false)
+  }
+
   async function handleDelete() {
     if (!confirm(`Permanently delete ${customer?.name}? This cannot be undone — all their data will be removed.`)) return
     await api.delete(`/customers/${id}`)
@@ -137,7 +151,7 @@ export default function CustomerDetail() {
 
   if (isLoading) return (
     <div className="p-8 flex justify-center">
-      <Spinner className="w-6 h-6 text-[#97B545]" />
+      <Spinner className="w-6 h-6 text-brand-lime" />
     </div>
   )
   if (!customer) return null
@@ -156,18 +170,18 @@ export default function CustomerDetail() {
     <div className="p-4 md:p-8 max-w-3xl mx-auto">
 
       {/* Back */}
-      <button onClick={() => navigate(-1)} className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 mb-6">
+      <button onClick={() => navigate(-1)} className="text-sm flex items-center gap-1 mb-6 transition-colors hover:text-brand-dark" style={{ color: 'rgba(15,55,20,0.45)' }}>
         ← Back
       </button>
 
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-[#0F3714]">{toTitleCase(customer.name)}</h1>
+            <h1 className="text-2xl font-bold text-brand-dark">{toTitleCase(customer.name)}</h1>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               {customer.type && (
-                <span className={`inline-flex text-xs font-medium px-2 py-1 rounded-full ${
+                <span className={`inline-flex text-xs font-semibold px-2.5 py-1 rounded-full ${
                   customer.type === 'commercial'
                     ? 'bg-[#DDB01D]/15 text-[#a07f00]'
                     : 'bg-[#97B545]/15 text-[#5a7020]'
@@ -176,64 +190,62 @@ export default function CustomerDetail() {
                 </span>
               )}
               {stats && (
-                <span className={`inline-flex text-xs font-medium px-2 py-1 rounded-full ${
+                <span className={`badge ${
                   stats.is_returning
-                    ? 'bg-green-100 text-green-700'
+                    ? 'badge-complete'
                     : stats.total_jobs > 0
-                      ? 'bg-gray-100 text-gray-500'
-                      : 'bg-gray-50 text-gray-400'
+                      ? 'badge-backlog'
+                      : 'bg-gray-100 text-gray-400'
                 }`}>
                   {stats.total_jobs === 0 ? 'No jobs yet' : stats.is_returning ? 'Returning' : 'One-off'}
                 </span>
               )}
             </div>
           </div>
-          <div className="flex-shrink-0">
-            <Link
-              to={`/customers/${id}/edit`}
-              className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-300 text-gray-700 transition-colors"
-            >
-              Edit
-            </Link>
-          </div>
+          <Link
+            to={`/customers/${id}/edit`}
+            className="text-sm font-semibold px-4 py-2 rounded-lg border border-black/8 hover:bg-white/70 text-brand-dark transition-colors"
+          >
+            Edit
+          </Link>
         </div>
       </div>
 
-      {/* Details */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white rounded-xl border border-gray-100 p-5 md:p-6 mb-5">
+      {/* Details card */}
+      <div className="card grid grid-cols-1 md:grid-cols-2 gap-5 p-5 md:p-6 mb-4">
 
         <div>
           <FieldLabel>Phone</FieldLabel>
           {customer.phone ? (
-            <a href={`tel:${phoneHref(customer.phone)}`} className="text-sm text-[#97B545] hover:underline">
+            <a href={`tel:${phoneHref(customer.phone)}`} className="text-sm text-brand-lime hover:underline font-medium">
               {formatPhone(customer.phone)}
             </a>
           ) : (
-            <p className="text-sm text-gray-400">—</p>
+            <p className="text-sm" style={{ color: 'rgba(0,0,0,0.25)' }}>—</p>
           )}
         </div>
 
         <div>
           <FieldLabel>Email</FieldLabel>
           {customer.email ? (
-            <a href={`mailto:${customer.email}`} className="text-sm text-[#97B545] hover:underline break-all">
+            <a href={`mailto:${customer.email}`} className="text-sm text-brand-lime hover:underline break-all font-medium">
               {customer.email.toLowerCase()}
             </a>
           ) : (
-            <p className="text-sm text-gray-400">—</p>
+            <p className="text-sm" style={{ color: 'rgba(0,0,0,0.25)' }}>—</p>
           )}
         </div>
 
         <div>
           <FieldLabel>Address</FieldLabel>
           {addressLines.length > 0 ? (
-            <p className="text-sm text-gray-800 leading-relaxed">
+            <p className="text-sm text-brand-dark leading-relaxed">
               {addressLines.map((line, i) => (
                 <span key={i}>{line}{i < addressLines.length - 1 && <br />}</span>
               ))}
             </p>
           ) : (
-            <p className="text-sm text-gray-400">—</p>
+            <p className="text-sm" style={{ color: 'rgba(0,0,0,0.25)' }}>—</p>
           )}
         </div>
 
@@ -244,26 +256,26 @@ export default function CustomerDetail() {
               href={`https://maps.google.com/?q=${encodeURIComponent(addr.postcode)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-[#97B545] hover:underline font-medium tracking-wide"
+              className="text-sm text-brand-lime hover:underline font-semibold tracking-wide"
             >
               {addr.postcode.toUpperCase()}
             </a>
           ) : (
-            <p className="text-sm text-gray-400">—</p>
+            <p className="text-sm" style={{ color: 'rgba(0,0,0,0.25)' }}>—</p>
           )}
         </div>
 
         <div>
           <FieldLabel>Rating</FieldLabel>
-          <p className="text-sm text-gray-800">{customer.rating ? `${customer.rating} / 5` : '—'}</p>
+          <p className="text-sm text-brand-dark">{customer.rating ? `${customer.rating} / 5` : '—'}</p>
         </div>
 
         <div>
           <FieldLabel>Loyalty Balance</FieldLabel>
-          <p className="text-sm text-gray-800">
+          <p className="text-sm">
             {customer.maintenance_hours_balance > 0
-              ? <span className="text-[#97B545] font-medium">{customer.maintenance_hours_balance.toFixed(1)} hrs</span>
-              : '—'
+              ? <span className="text-brand-lime font-semibold">{customer.maintenance_hours_balance.toFixed(1)} hrs</span>
+              : <span style={{ color: 'rgba(0,0,0,0.25)' }}>—</span>
             }
           </p>
         </div>
@@ -282,33 +294,86 @@ export default function CustomerDetail() {
                   onChange={e => setDiscountInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') saveDiscount(); if (e.key === 'Escape') setEditingDiscount(false) }}
                   autoFocus
-                  className="w-20 rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#97B545]"
+                  className="w-20 field-input py-1.5 px-2 pr-6 text-center"
                 />
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs" style={{ color: 'rgba(15,55,20,0.4)' }}>%</span>
               </div>
               <button
                 onClick={saveDiscount}
                 disabled={savingDiscount}
-                className="text-xs font-medium text-[#97B545] hover:text-[#5a7020] disabled:opacity-50"
+                className="flex items-center gap-1 text-xs font-semibold text-brand-lime hover:text-brand-forest disabled:opacity-50"
               >
-                {savingDiscount ? 'Saving…' : 'Save'}
+                {savingDiscount && <Spinner className="w-3 h-3 text-brand-lime" />}
+                Save
               </button>
-              <button onClick={() => setEditingDiscount(false)} className="text-xs text-gray-400 hover:text-gray-600">
+              <button onClick={() => setEditingDiscount(false)} className="text-xs" style={{ color: 'rgba(15,55,20,0.4)' }}>
                 Cancel
               </button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <p className="text-sm text-gray-800">
+              <p className="text-sm">
                 {customer.discount_pct > 0
-                  ? <span className="text-amber-700 font-medium">{customer.discount_pct}% off</span>
-                  : <span className="text-gray-400">None</span>
+                  ? <span className="font-semibold" style={{ color: '#DDB01D' }}>{customer.discount_pct}% off</span>
+                  : <span style={{ color: 'rgba(0,0,0,0.25)' }}>None</span>
                 }
               </p>
               <button
                 onClick={() => { setDiscountInput(String(customer.discount_pct ?? 0)); setEditingDiscount(true) }}
-                className="text-xs text-gray-400 hover:text-gray-600"
+                className="text-xs transition-colors"
+                style={{ color: 'rgba(15,55,20,0.35)' }}
                 title="Edit discount"
+              >
+                ✏
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <FieldLabel>Default Callout Fee</FieldLabel>
+          {editingCallout ? (
+            <div className="flex items-center gap-2 mt-1">
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs" style={{ color: 'rgba(15,55,20,0.4)' }}>€</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={calloutInput}
+                  onChange={e => setCalloutInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveCallout(); if (e.key === 'Escape') setEditingCallout(false) }}
+                  placeholder="0.00"
+                  autoFocus
+                  className="w-24 field-input py-1.5 pl-6 pr-2 text-center"
+                />
+              </div>
+              <span className="text-xs" style={{ color: 'rgba(15,55,20,0.4)' }}>ex-VAT</span>
+              <button
+                onClick={saveCallout}
+                disabled={savingCallout}
+                className="flex items-center gap-1 text-xs font-semibold text-brand-lime hover:text-brand-forest disabled:opacity-50"
+              >
+                {savingCallout && <Spinner className="w-3 h-3 text-brand-lime" />}
+                Save
+              </button>
+              <button onClick={() => setEditingCallout(false)} className="text-xs" style={{ color: 'rgba(15,55,20,0.4)' }}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <p className="text-sm">
+                {customer.default_callout_fee && customer.default_callout_fee > 0
+                  ? <span className="text-brand-dark font-semibold">€{customer.default_callout_fee.toFixed(2)} ex-VAT</span>
+                  : <span style={{ color: 'rgba(0,0,0,0.25)' }}>None</span>
+                }
+              </p>
+              <button
+                onClick={() => { setCalloutInput(customer.default_callout_fee ? String(customer.default_callout_fee) : ''); setEditingCallout(true) }}
+                className="text-xs transition-colors"
+                style={{ color: 'rgba(15,55,20,0.35)' }}
+                title="Edit callout fee"
               >
                 ✏
               </button>
@@ -319,76 +384,76 @@ export default function CustomerDetail() {
       </div>
 
       {customer.notes && (
-        <div className="bg-white rounded-xl border border-gray-100 p-5 md:p-6 mb-5">
-          <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-2">Notes</p>
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">{customer.notes}</p>
+        <div className="card p-5 md:p-6 mb-4">
+          <p className="section-label">Notes</p>
+          <p className="text-sm text-brand-dark whitespace-pre-wrap">{customer.notes}</p>
         </div>
       )}
 
       {/* Job History */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 md:p-6 mb-5">
-        <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-4">Job History</p>
+      <div className="card p-5 md:p-6 mb-4">
+        <p className="section-label">Job History</p>
 
         {historyLoading ? (
           <div className="flex justify-center py-6">
-            <Spinner className="w-5 h-5 text-[#97B545]" />
+            <Spinner className="w-5 h-5 text-brand-lime" />
           </div>
         ) : !stats || stats.total_jobs === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">No jobs recorded yet.</p>
+          <p className="text-sm text-center py-4" style={{ color: 'rgba(15,55,20,0.4)' }}>No jobs recorded yet.</p>
         ) : (
           <>
             {/* Stats row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5 pb-5 border-b border-gray-100">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5 pb-5 border-b border-black/5">
               <div>
-                <p className="text-xs text-gray-400 mb-0.5">Total Jobs</p>
-                <p className="text-lg font-semibold text-[#0F3714]">{stats.total_jobs}</p>
+                <p className="text-xs mb-0.5" style={{ color: 'rgba(15,55,20,0.4)' }}>Total Jobs</p>
+                <p className="text-lg font-bold text-brand-dark">{stats.total_jobs}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-400 mb-0.5">Total Visits</p>
-                <p className="text-lg font-semibold text-[#0F3714]">{stats.total_visits}</p>
+                <p className="text-xs mb-0.5" style={{ color: 'rgba(15,55,20,0.4)' }}>Total Visits</p>
+                <p className="text-lg font-bold text-brand-dark">{stats.total_visits}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-400 mb-0.5">First Job</p>
-                <p className="text-sm font-medium text-gray-700">{formatDate(stats.first_job_date)}</p>
+                <p className="text-xs mb-0.5" style={{ color: 'rgba(15,55,20,0.4)' }}>First Job</p>
+                <p className="text-sm font-semibold text-brand-dark">{formatDate(stats.first_job_date)}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-400 mb-0.5">Last Job</p>
-                <p className="text-sm font-medium text-gray-700">{formatDate(stats.last_job_date)}</p>
+                <p className="text-xs mb-0.5" style={{ color: 'rgba(15,55,20,0.4)' }}>Last Job</p>
+                <p className="text-sm font-semibold text-brand-dark">{formatDate(stats.last_job_date)}</p>
               </div>
             </div>
 
             {/* Job list */}
-            <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-black/5">
               {history!.jobs.map(job => (
                 <div
                   key={job.id}
                   onClick={() => navigate(`/jobs/${job.id}`)}
-                  className="flex items-center justify-between py-3 cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded-lg transition-colors"
+                  className="flex items-center justify-between py-3 cursor-pointer rounded-lg -mx-2 px-2 transition-colors hover:bg-black/3"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{job.title}</p>
+                      <p className="text-sm font-semibold text-brand-dark truncate">{job.title}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${typeStyle(job.type)}`}>
+                        <span className={`badge ${typeStyle(job.type)}`}>
                           {typeLabel(job.type)}
                         </span>
-                        <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${jobStatusStyle(job.status)}`}>
+                        <span className={`badge ${jobStatusStyle(job.status)}`}>
                           {jobStatusLabel(job.status)}
                         </span>
                         {job.scheduled_date && (
-                          <span className="text-xs text-gray-400">{formatDate(job.scheduled_date)}</span>
+                          <span className="text-xs" style={{ color: 'rgba(15,55,20,0.45)' }}>{formatDate(job.scheduled_date)}</span>
                         )}
                       </div>
                     </div>
                   </div>
                   <div className="flex-shrink-0 text-right ml-4">
                     {job.total_charged > 0 && (
-                      <p className="text-sm font-medium text-gray-800">
+                      <p className="text-sm font-semibold text-brand-dark">
                         €{job.total_charged.toFixed(2)}
                       </p>
                     )}
                     {job.work_logs_count > 0 && (
-                      <p className="text-xs text-gray-400">{job.work_logs_count} {job.work_logs_count === 1 ? 'visit' : 'visits'}</p>
+                      <p className="text-xs" style={{ color: 'rgba(15,55,20,0.4)' }}>{job.work_logs_count} {job.work_logs_count === 1 ? 'visit' : 'visits'}</p>
                     )}
                   </div>
                 </div>
@@ -402,13 +467,14 @@ export default function CustomerDetail() {
       <div className="flex items-center gap-6 pt-2 pb-4">
         <button
           onClick={handleArchive}
-          className="text-sm text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+          className="text-sm transition-colors cursor-pointer"
+          style={{ color: 'rgba(15,55,20,0.4)' }}
         >
           Archive customer
         </button>
         <button
           onClick={handleDelete}
-          className="text-sm text-red-400 hover:text-red-600 transition-colors cursor-pointer"
+          className="text-sm text-danger transition-colors cursor-pointer"
         >
           Delete customer
         </button>

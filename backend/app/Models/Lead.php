@@ -11,10 +11,16 @@ class Lead extends Model
         'name',
         'phone',
         'email',
+        'eircode',
         'source',
         'status',
+        'requires_site_visit',
         'notes',
         'converted_customer_id',
+    ];
+
+    protected $casts = [
+        'requires_site_visit' => 'boolean',
     ];
 
     public function convertedCustomer(): BelongsTo

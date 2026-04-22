@@ -17,6 +17,7 @@ import LeadList from './pages/leads/LeadList'
 import LeadForm from './pages/leads/LeadForm'
 import InvoiceList from './pages/invoices/InvoiceList'
 import InvoiceDetail from './pages/invoices/InvoiceDetail'
+import Profile from './pages/Profile'
 
 export default function App() {
   return (
@@ -42,11 +43,13 @@ export default function App() {
             <Route path="/jobs/:id" element={<JobDetail />} />
             <Route path="/jobs/:id/edit" element={<JobForm />} />
             <Route path="/jobs/:id/logs/new" element={<WorkLogForm />} />
+            <Route path="/jobs/:id/logs/:logId/edit" element={<WorkLogForm />} />
             <Route path="/leads" element={<LeadList />} />
             <Route path="/leads/new" element={<LeadForm />} />
             <Route path="/leads/:id/edit" element={<LeadForm />} />
             <Route path="/invoices" element={<InvoiceList />} />
             <Route path="/invoices/:id" element={<InvoiceDetail />} />
+            <Route path="/profile" element={<Profile />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

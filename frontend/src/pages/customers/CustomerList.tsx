@@ -94,14 +94,15 @@ export default function CustomerList() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-[#0F3714]">Customers</h1>
+          <h1 className="text-2xl font-bold text-brand-dark">Customers</h1>
           {result && (
-            <p className="text-gray-400 text-sm mt-0.5">{result.total.toLocaleString()} total</p>
+            <p className="text-sm mt-0.5" style={{ color: 'rgba(15,55,20,0.45)' }}>{result.total.toLocaleString()} total</p>
           )}
         </div>
         <Link
           to="/customers/new"
-          className="bg-[#97B545] hover:bg-[#85a03d] text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          className="text-sm font-bold px-4 py-2.5 rounded-lg transition-all hover:brightness-95"
+          style={{ background: '#97B545', color: '#0F3714' }}
         >
           + Add
         </Link>
@@ -109,7 +110,7 @@ export default function CustomerList() {
 
       {/* Search */}
       <div className="relative mb-3">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(15,55,20,0.35)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
         <input
@@ -117,19 +118,18 @@ export default function CustomerList() {
           value={search}
           onChange={handleSearch}
           placeholder="Search by name, phone, email or eircode…"
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545] focus:border-transparent"
+          className="field-input pl-10"
         />
       </div>
 
       {/* Activity filter */}
       <div className="flex items-center gap-2 mb-5">
-        <label className="text-xs text-gray-400 font-medium uppercase tracking-wide whitespace-nowrap">Activity</label>
+        <label className="text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: 'rgba(15,55,20,0.4)' }}>Activity</label>
         <select
           value={activity}
           onChange={e => handleActivity(e.target.value)}
-          className={`text-sm border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#97B545] transition-colors ${
-            activity ? 'border-[#97B545] text-[#5a7020] bg-[#97B545]/5' : 'border-gray-200 text-gray-600'
-          }`}
+          className={`field-input py-1.5 w-auto ${activity ? 'font-medium' : ''}`}
+          style={activity ? { color: '#0F3714', borderColor: '#97B545' } : {}}
         >
           {ACTIVITY_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -138,25 +138,25 @@ export default function CustomerList() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="table-card">
         {isLoading ? (
           <div className="p-12 flex justify-center">
-            <Spinner className="w-6 h-6 text-[#97B545]" />
+            <Spinner className="w-6 h-6 text-brand-lime" />
           </div>
         ) : result?.data.length === 0 ? (
-          <div className="p-12 text-center text-gray-400 text-sm">No customers found.</div>
+          <div className="p-12 text-center text-sm" style={{ color: 'rgba(15,55,20,0.4)' }}>No customers found.</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 text-left">
-                <th className="px-4 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+              <tr className="thead-dark text-left">
+                <th>
                   <button
                     onClick={toggleSort}
                     style={{ touchAction: 'manipulation' }}
-                    className="flex items-center gap-1 hover:text-gray-600 transition-colors cursor-pointer select-none"
+                    className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer select-none text-white/60 text-[0.65rem] font-bold uppercase tracking-[0.09em]"
                   >
                     Name
-                    <span className="text-gray-300">
+                    <span>
                       {sortDir === 'asc' ? (
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
@@ -169,17 +169,17 @@ export default function CustomerList() {
                     </span>
                   </button>
                 </th>
-                <th className="px-4 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Eircode</th>
-                <th className="px-4 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Phone</th>
-                <th className="px-4 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Email</th>
+                <th className="hidden md:table-cell">Eircode</th>
+                <th className="hidden md:table-cell">Phone</th>
+                <th className="hidden lg:table-cell">Email</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-black/4">
               {result?.data.map(c => (
-                <tr key={c.id} onClick={() => navigate(`/customers/${c.id}`)} className="hover:bg-gray-50 transition-colors cursor-pointer">
+                <tr key={c.id} onClick={() => navigate(`/customers/${c.id}`)} className="tr-hover transition-colors cursor-pointer">
 
                   <td className="px-4 py-3">
-                    <span className="font-medium text-gray-900">{toTitleCase(c.name)}</span>
+                    <span className="font-semibold text-brand-dark">{toTitleCase(c.name)}</span>
 
                     <div className="md:hidden flex justify-between items-center mt-1">
                       <span>
@@ -188,13 +188,13 @@ export default function CustomerList() {
                             href={`https://maps.google.com/?q=${encodeURIComponent(c.address.postcode)}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-[#97B545] font-medium tracking-wide"
+                            className="text-xs text-brand-lime font-medium tracking-wide"
                             onClick={e => e.stopPropagation()}
                           >
                             {c.address.postcode.toUpperCase()}
                           </a>
                         ) : (
-                          <span className="text-xs text-gray-300">—</span>
+                          <span className="text-xs" style={{ color: 'rgba(0,0,0,0.2)' }}>—</span>
                         )}
                       </span>
                       <span>
@@ -207,7 +207,7 @@ export default function CustomerList() {
                             {formatPhone(c.phone)}
                           </a>
                         ) : (
-                          <span className="text-xs text-gray-300">—</span>
+                          <span className="text-xs" style={{ color: 'rgba(0,0,0,0.2)' }}>—</span>
                         )}
                       </span>
                     </div>
@@ -225,7 +225,7 @@ export default function CustomerList() {
                     {c.email && (
                       <a
                         href={`mailto:${c.email}`}
-                        className="hidden md:block lg:hidden text-xs text-gray-400 hover:text-[#97B545] mt-0.5 transition-colors"
+                        className="hidden md:block lg:hidden text-xs text-gray-400 hover:text-brand-lime mt-0.5 transition-colors"
                         onClick={e => e.stopPropagation()}
                       >
                         {c.email.toLowerCase()}
@@ -239,13 +239,13 @@ export default function CustomerList() {
                         href={`https://maps.google.com/?q=${encodeURIComponent(c.address.postcode)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#97B545] hover:underline font-medium tracking-wide"
+                        className="text-brand-lime hover:underline font-medium tracking-wide"
                         onClick={e => e.stopPropagation()}
                       >
                         {c.address.postcode.toUpperCase()}
                       </a>
                     ) : (
-                      <span className="text-gray-300">—</span>
+                      <span style={{ color: 'rgba(0,0,0,0.2)' }}>—</span>
                     )}
                   </td>
 
@@ -253,13 +253,13 @@ export default function CustomerList() {
                     {c.phone ? (
                       <a
                         href={`tel:${phoneHref(c.phone)}`}
-                        className="text-gray-600 hover:text-[#97B545] transition-colors"
+                        className="text-gray-600 hover:text-brand-lime transition-colors"
                         onClick={e => e.stopPropagation()}
                       >
                         {formatPhone(c.phone)}
                       </a>
                     ) : (
-                      <span className="text-gray-300">—</span>
+                      <span style={{ color: 'rgba(0,0,0,0.2)' }}>—</span>
                     )}
                   </td>
 
@@ -267,13 +267,13 @@ export default function CustomerList() {
                     {c.email ? (
                       <a
                         href={`mailto:${c.email}`}
-                        className="text-gray-600 hover:text-[#97B545] transition-colors"
+                        className="text-gray-600 hover:text-brand-lime transition-colors"
                         onClick={e => e.stopPropagation()}
                       >
                         {c.email.toLowerCase()}
                       </a>
                     ) : (
-                      <span className="text-gray-300">—</span>
+                      <span style={{ color: 'rgba(0,0,0,0.2)' }}>—</span>
                     )}
                   </td>
 
@@ -286,20 +286,20 @@ export default function CustomerList() {
 
       {/* Pagination */}
       {result && result.last_page > 1 && (
-        <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
+        <div className="flex items-center justify-between mt-4 text-sm" style={{ color: 'rgba(15,55,20,0.5)' }}>
           <span>Page {result.current_page} of {result.last_page}</span>
           <div className="flex gap-2">
             <button
               onClick={() => setPage(page - 1)}
               disabled={page === 1}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 disabled:opacity-40 hover:border-gray-300 transition-colors"
+              className="px-3 py-1.5 rounded-lg border border-black/8 disabled:opacity-40 hover:bg-white/60 transition-colors"
             >
               Previous
             </button>
             <button
               onClick={() => setPage(page + 1)}
               disabled={page === result.last_page}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 disabled:opacity-40 hover:border-gray-300 transition-colors"
+              className="px-3 py-1.5 rounded-lg border border-black/8 disabled:opacity-40 hover:bg-white/60 transition-colors"
             >
               Next
             </button>

@@ -13,6 +13,7 @@ class WorkLogEntry extends Model
         'start_time',
         'end_time',
         'break_minutes',
+        'has_power_tools',
         'billable_hours',
         'rate_per_hour',
         'pay_rate',
@@ -25,6 +26,7 @@ class WorkLogEntry extends Model
     protected function casts(): array
     {
         return [
+            'has_power_tools' => 'boolean',
             'billable_hours'  => 'float',
             'rate_per_hour'   => 'float',
             'pay_rate'        => 'float',

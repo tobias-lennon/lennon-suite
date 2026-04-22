@@ -14,17 +14,13 @@ interface FormState {
   description: string
   type: string
   status: string
-  has_power_tools: boolean
-  has_waste_disposal: boolean
   weather_req: string
   est_duration: string
   priority: string
   scheduled_date: string
+  due_by: string
   notes: string
-}
-
-function todayString() {
-  return new Date().toISOString().substring(0, 10)
+  callout_fee: string
 }
 
 function cleanText(str: string): string {
@@ -38,13 +34,13 @@ const BLANK: FormState = {
   description: '',
   type: 'standard',
   status: 'backlog',
-  has_power_tools: false,
-  has_waste_disposal: false,
   weather_req: 'any',
   est_duration: '',
   priority: 'normal',
-  scheduled_date: todayString(),
+  scheduled_date: '',
+  due_by: '',
   notes: '',
+  callout_fee: '',
 }
 
 export default function JobForm() {
@@ -71,7 +67,7 @@ export default function JobForm() {
 
   // New customer modal
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false)
-  const [newCustomerForm, setNewCustomerForm] = useState({ name: '', type: 'residential', phone: '' })
+  const [newCustomerForm, setNewCustomerForm] = useState({ name: '', type: 'residential', phone: '', email: '', eircode: '' })
   const [newCustomerErrors, setNewCustomerErrors] = useState<Record<string, string>>({})
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false)
 
@@ -97,19 +93,18 @@ export default function JobForm() {
         name:  newCustomerForm.name.trim(),
         type:  newCustomerForm.type,
         phone: newCustomerForm.phone.trim() || null,
+        email: newCustomerForm.email.trim() || null,
+        ...(newCustomerForm.eircode.trim() ? { address: { postcode: newCustomerForm.eircode.trim() } } : {}),
       })
       selectCustomer({ id: res.data.id, name: res.data.name })
       setShowNewCustomerModal(false)
-      setNewCustomerForm({ name: '', type: 'residential', phone: '' })
+      setNewCustomerForm({ name: '', type: 'residential', phone: '', email: '', eircode: '' })
     } finally {
       setIsCreatingCustomer(false)
     }
   }
 
   const isInternal = form.type === 'internal'
-  const isMaintenance = form.type === 'maintenance'
-  const isSiteVisit = form.type === 'site_visit'
-  const showPowerWasteOptions = !isMaintenance && !isInternal && !isSiteVisit
 
   // Customer search — debounced
   useEffect(() => {
@@ -157,13 +152,13 @@ export default function JobForm() {
         description: j.description ?? '',
         type: j.type ?? 'standard',
         status: j.status ?? 'backlog',
-        has_power_tools: j.has_power_tools ?? false,
-        has_waste_disposal: j.has_waste_disposal ?? false,
         weather_req: j.weather_req ?? 'any',
         est_duration: j.est_duration ?? '',
         priority: j.priority ?? 'normal',
-        scheduled_date: j.scheduled_date ? j.scheduled_date.substring(0, 10) : todayString(),
+        scheduled_date: j.scheduled_date ? j.scheduled_date.substring(0, 10) : '',
+        due_by: j.due_by ? j.due_by.substring(0, 10) : '',
         notes: j.notes ?? '',
+        callout_fee: j.callout_fee != null ? String(j.callout_fee) : '',
       })
       if (j.customer) setSelectedCustomerName(j.customer.name)
       setIsLoading(false)
@@ -181,8 +176,6 @@ export default function JobForm() {
       type: value,
       customer_id: value === 'internal' ? '' : prev.customer_id,
       weather_req: value === 'internal' ? 'any' : prev.weather_req,
-      has_power_tools: (value === 'maintenance' || value === 'internal' || value === 'site_visit') ? false : prev.has_power_tools,
-      has_waste_disposal: (value === 'maintenance' || value === 'internal' || value === 'site_visit') ? false : prev.has_waste_disposal,
     }))
     if (value === 'internal') {
       setSelectedCustomerName('')
@@ -209,6 +202,7 @@ export default function JobForm() {
     if (!form.customer_id && !isInternal) errs.customer_id = 'Customer is required'
     if (!form.title.trim()) errs.title = 'Title is required'
     if (!form.type) errs.type = 'Type is required'
+    if (form.status === 'scheduled' && !form.scheduled_date) errs.scheduled_date = 'A date is required when scheduling a job'
     setErrors(errs)
     if (Object.keys(errs).length > 0) {
       if (errs.customer_id) customerSearchRef.current?.focus()
@@ -233,6 +227,8 @@ export default function JobForm() {
       customer_id: form.customer_id ? Number(form.customer_id) : null,
       est_duration: form.est_duration || null,
       scheduled_date: form.scheduled_date || null,
+      due_by: form.due_by || null,
+      callout_fee: form.callout_fee.trim() !== '' ? Number(form.callout_fee) : null,
     }
 
     try {
@@ -266,13 +262,8 @@ export default function JobForm() {
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link to={isEdit ? `/jobs/${id}` : '/jobs'} className="text-sm text-gray-500 hover:text-gray-700">
-          ← Back
-        </Link>
-        <h1 className="text-xl font-semibold text-gray-900">
-          {isEdit ? 'Edit Job' : 'New Job'}
-        </h1>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-brand-dark">{isEdit ? 'Edit Job' : 'New Job'}</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -284,7 +275,7 @@ export default function JobForm() {
             <select
               value={form.type}
               onChange={e => handleTypeChange(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
+              className="field-input"
             >
               <option value="standard">Standard</option>
               <option value="maintenance">Maintenance</option>
@@ -297,12 +288,12 @@ export default function JobForm() {
             <select
               value={form.status}
               onChange={e => set('status', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
+              className="field-input"
             >
               <option value="backlog">Backlog</option>
               <option value="scheduled">Scheduled</option>
-              <option value="in_progress">In Progress</option>
-              <option value="complete">Complete</option>
+              {isEdit && <option value="in_progress">In Progress</option>}
+              {isEdit && <option value="complete">Complete</option>}
             </select>
           </div>
         </div>
@@ -312,7 +303,7 @@ export default function JobForm() {
           <div className="relative">
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">
-                Customer <span className="text-red-500">*</span>
+                Customer <span className="text-danger">*</span>
               </label>
               <button
                 type="button"
@@ -325,7 +316,7 @@ export default function JobForm() {
 
             {/* Selected customer pill */}
             {selectedCustomerName ? (
-              <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50">
+              <div className="flex items-center gap-2 field-input" style={{ background: 'rgba(255,255,255,0.5)' }}>
                 <span className="flex-1 text-gray-900">{selectedCustomerName}</span>
                 <button
                   type="button"
@@ -344,7 +335,7 @@ export default function JobForm() {
                   onChange={e => setCustomerSearch(e.target.value)}
                   onFocus={() => customerSearch.length >= 1 && setShowCustomerDropdown(true)}
                   placeholder="Search by name…"
-                  className={`w-full border rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545] ${errors.customer_id ? 'border-red-400' : 'border-gray-300'}`}
+                  className={`field-input pr-8${errors.customer_id ? ' field-error' : ''}`}
                 />
                 {customerSearching && (
                   <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
@@ -376,14 +367,14 @@ export default function JobForm() {
               </div>
             )}
 
-            {errors.customer_id && <p className="text-red-500 text-xs mt-1">{errors.customer_id}</p>}
+            {errors.customer_id && <p className="text-xs mt-1 text-danger">{errors.customer_id}</p>}
           </div>
         )}
 
         {/* Title */}
         <div>
           <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-            Title <span className="text-red-500">*</span>
+            Title <span className="text-danger">*</span>
           </label>
           <input
             ref={titleRef}
@@ -391,9 +382,9 @@ export default function JobForm() {
             value={form.title}
             onChange={e => set('title', e.target.value)}
             placeholder="e.g. Hedge trim, Garden clearup"
-            className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545] ${errors.title ? 'border-red-400' : 'border-gray-300'}`}
+            className={`field-input${errors.title ? ' field-error' : ''}`}
           />
-          {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
+          {errors.title && <p className="text-xs mt-1 text-danger">{errors.title}</p>}
         </div>
 
         {/* Description */}
@@ -405,33 +396,9 @@ export default function JobForm() {
             value={form.description}
             onChange={e => set('description', e.target.value)}
             rows={3}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
+            className="field-input"
           />
         </div>
-
-        {/* Power tools + waste — hidden for maintenance, internal, site_visit */}
-        {showPowerWasteOptions && (
-          <div className="flex gap-6">
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.has_power_tools}
-                onChange={e => set('has_power_tools', e.target.checked)}
-                className="rounded accent-[#97B545]"
-              />
-              Power tools
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.has_waste_disposal}
-                onChange={e => set('has_waste_disposal', e.target.checked)}
-                className="rounded accent-[#97B545]"
-              />
-              Waste disposal
-            </label>
-          </div>
-        )}
 
         {/* Priority + Duration */}
         <div className="grid grid-cols-2 gap-4">
@@ -440,7 +407,7 @@ export default function JobForm() {
             <select
               value={form.priority}
               onChange={e => set('priority', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
+              className="field-input"
             >
               <option value="normal">Normal</option>
               <option value="high">High</option>
@@ -452,9 +419,9 @@ export default function JobForm() {
             <select
               value={form.est_duration}
               onChange={e => set('est_duration', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
+              className="field-input"
             >
-              <option value="">— Unknown —</option>
+              <option value="">— Select —</option>
               <option value="quick">Quick (&lt;2hrs)</option>
               <option value="half_day">Half day</option>
               <option value="full_day">Full day</option>
@@ -471,7 +438,7 @@ export default function JobForm() {
               <select
                 value={form.weather_req}
                 onChange={e => set('weather_req', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
+                className="field-input"
               >
                 <option value="any">Any</option>
                 <option value="dry_preferred">Dry preferred</option>
@@ -479,15 +446,29 @@ export default function JobForm() {
               </select>
             </div>
           )}
-          <div className={isInternal ? 'col-span-2' : ''}>
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Scheduled Date</label>
-            <input
-              type="date"
-              value={form.scheduled_date}
-              onChange={e => set('scheduled_date', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
-            />
-          </div>
+          {form.status === 'scheduled' && (
+            <div className={isInternal ? 'col-span-2' : ''}>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Scheduled Date</label>
+              <input
+                type="date"
+                value={form.scheduled_date}
+                onChange={e => set('scheduled_date', e.target.value)}
+                className={`field-input${errors.scheduled_date ? ' field-error' : ''}`}
+              />
+              {errors.scheduled_date && <p className="text-xs mt-1 text-danger">{errors.scheduled_date}</p>}
+            </div>
+          )}
+          {form.status !== 'complete' && (
+            <div className={isInternal ? 'col-span-2' : ''}>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Due By</label>
+              <input
+                type="date"
+                value={form.due_by}
+                onChange={e => set('due_by', e.target.value)}
+                className="field-input"
+              />
+            </div>
+          )}
         </div>
 
         {/* Notes */}
@@ -497,12 +478,34 @@ export default function JobForm() {
             value={form.notes}
             onChange={e => set('notes', e.target.value)}
             rows={3}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
+            className="field-input"
           />
         </div>
 
+        {/* Callout fee default — hidden for internal jobs */}
+        {!isInternal && (
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              Callout fee default (ex-VAT)
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">€</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.callout_fee}
+                onChange={e => set('callout_fee', e.target.value)}
+                placeholder="0.00"
+                className="w-36 field-input"
+              />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Pre-fills the callout fee on each new work log for this job. Leave blank for none.</p>
+          </div>
+        )}
+
         {serverError && (
-          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <p className="text-sm notice notice-error">
             {serverError}
           </p>
         )}
@@ -511,10 +514,11 @@ export default function JobForm() {
           <button
             type="submit"
             disabled={isSaving}
-            className="px-5 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60"
+            className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60"
             style={{ backgroundColor: '#97B545' }}
           >
-            {isSaving ? 'Saving…' : isEdit ? 'Save changes' : 'Create job'}
+            {isSaving && <Spinner className="w-4 h-4 text-[#0F3714]" />}
+            {isEdit ? 'Save changes' : 'Create job'}
           </button>
           <Link
             to={isEdit ? `/jobs/${id}` : '/jobs'}
@@ -532,12 +536,12 @@ export default function JobForm() {
             className="absolute inset-0 bg-black/40"
             onClick={() => setShowNewCustomerModal(false)}
           />
-          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-sm p-6">
             <h2 className="text-base font-semibold text-gray-900 mb-4">New Customer</h2>
             <form onSubmit={handleCreateCustomer} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                  Name <span className="text-red-500">*</span>
+                  Name <span className="text-danger">*</span>
                 </label>
                 <input
                   type="text"
@@ -545,16 +549,16 @@ export default function JobForm() {
                   onChange={e => setNewCustomerForm(p => ({ ...p, name: e.target.value }))}
                   placeholder="Full name"
                   autoFocus
-                  className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545] ${newCustomerErrors.name ? 'border-red-400' : 'border-gray-300'}`}
+                  className={`field-input${newCustomerErrors.name ? ' field-error' : ''}`}
                 />
-                {newCustomerErrors.name && <p className="text-red-500 text-xs mt-1">{newCustomerErrors.name}</p>}
+                {newCustomerErrors.name && <p className="text-xs mt-1 text-danger">{newCustomerErrors.name}</p>}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Type</label>
                 <select
                   value={newCustomerForm.type}
                   onChange={e => setNewCustomerForm(p => ({ ...p, type: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
+                  className="field-input"
                 >
                   <option value="residential">Residential</option>
                   <option value="commercial">Commercial</option>
@@ -567,17 +571,38 @@ export default function JobForm() {
                   value={newCustomerForm.phone}
                   onChange={e => setNewCustomerForm(p => ({ ...p, phone: e.target.value }))}
                   placeholder="e.g. 087 123 4567"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
+                  className="field-input"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Email</label>
+                <input
+                  type="email"
+                  value={newCustomerForm.email}
+                  onChange={e => setNewCustomerForm(p => ({ ...p, email: e.target.value }))}
+                  placeholder="e.g. name@example.com"
+                  className="field-input"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Eircode</label>
+                <input
+                  type="text"
+                  value={newCustomerForm.eircode}
+                  onChange={e => setNewCustomerForm(p => ({ ...p, eircode: e.target.value }))}
+                  placeholder="e.g. P51 AB12"
+                  className="field-input"
                 />
               </div>
               <div className="flex items-center gap-3 pt-1">
                 <button
                   type="submit"
                   disabled={isCreatingCustomer}
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60"
                   style={{ backgroundColor: '#97B545' }}
                 >
-                  {isCreatingCustomer ? 'Creating…' : 'Create & select'}
+                  {isCreatingCustomer && <Spinner className="w-3.5 h-3.5 text-white" />}
+                  Create & select
                 </button>
                 <button
                   type="button"

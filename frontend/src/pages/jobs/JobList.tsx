@@ -8,26 +8,19 @@ function InvoiceTag({ job }: { job: Job }) {
   const navigate = useNavigate()
   if (job.type === 'internal' || job.status !== 'complete') return null
   if (job.invoice) {
-    const colour = job.invoice.status === 'paid'
-      ? 'bg-green-100 text-green-700'
-      : job.invoice.status === 'sent'
-        ? 'bg-blue-100 text-blue-700'
-        : 'bg-gray-100 text-gray-500'
+    const mod = job.invoice.status === 'paid' ? 'badge-paid' : job.invoice.status === 'sent' ? 'badge-sent' : 'badge-draft'
+    const label = job.invoice.status === 'paid' ? 'Paid' : job.invoice.status === 'sent' ? 'Sent' : 'Not Sent'
     return (
       <button
         onClick={e => { e.preventDefault(); e.stopPropagation(); navigate(`/invoices/${job.invoice!.id}`) }}
-        className={`px-1.5 py-0.5 rounded text-xs font-medium ${colour}`}
+        className={`badge ${mod}`}
         title={job.invoice.invoice_number}
       >
-        {job.invoice.status === 'paid' ? 'Paid' : job.invoice.status === 'sent' ? 'Sent' : 'Invoiced'}
+        {label}
       </button>
     )
   }
-  return (
-    <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
-      Invoice needed
-    </span>
-  )
+  return <span className="badge badge-warning" style={{ background: 'rgba(221,176,29,0.18)', color: '#0F3714' }}>Invoice needed</span>
 }
 
 interface InvoiceSummary {
@@ -43,6 +36,7 @@ interface Job {
   status: 'backlog' | 'scheduled' | 'in_progress' | 'complete'
   priority: 'normal' | 'high' | 'urgent'
   scheduled_date: string | null
+  due_by: string | null
   work_logs_count: number
   customer: { id: number; name: string; address?: { postcode: string | null } | null } | null
   invoice: InvoiceSummary | null
@@ -71,16 +65,16 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 const PRIORITY_COLOURS: Record<string, string> = {
-  urgent: 'bg-red-100 text-red-800',
-  high: 'bg-yellow-100 text-yellow-800',
-  normal: 'bg-gray-100 text-gray-600',
+  urgent: 'badge-urgent',
+  high:   'badge-high',
+  normal: 'badge-normal',
 }
 
 const STATUS_COLOURS: Record<string, string> = {
-  backlog: 'bg-gray-100 text-gray-700',
-  scheduled: 'bg-blue-100 text-blue-800',
-  in_progress: 'bg-yellow-100 text-yellow-800',
-  complete: 'bg-green-100 text-green-800',
+  backlog:     'badge-backlog',
+  scheduled:   'badge-scheduled',
+  in_progress: 'badge-in-progress',
+  complete:    'badge-complete',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -90,8 +84,19 @@ const STATUS_LABELS: Record<string, string> = {
   complete: 'Complete',
 }
 
+function dueBadge(dueBy: string | null, status: string) {
+  if (!dueBy || status === 'complete') return null
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const due = new Date(dueBy)
+  const diff = Math.floor((due.getTime() - today.getTime()) / 86400000)
+  if (diff < 0)  return <span style={{ color: '#B84A2A', fontWeight: 600 }} className="text-xs">Due {due.toLocaleDateString('en-IE')} · Overdue</span>
+  if (diff <= 7) return <span style={{ color: '#DDB01D', fontWeight: 600 }} className="text-xs">Due {due.toLocaleDateString('en-IE')} · {diff === 0 ? 'Today' : `${diff}d`}</span>
+  return <span className="text-xs" style={{ color: 'rgba(15,55,20,0.5)' }}>Due {due.toLocaleDateString('en-IE')}</span>
+}
+
 export default function JobList() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [result, setResult] = useState<Paginated | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -136,41 +141,44 @@ export default function JobList() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Jobs</h1>
+        <h1 className="text-2xl font-bold text-brand-dark">Jobs</h1>
         <Link
           to="/jobs/new"
-          className="px-4 py-2 rounded-lg text-sm font-medium text-white"
-          style={{ backgroundColor: '#97B545' }}
+          className="px-4 py-2.5 rounded-lg text-sm font-bold transition-all hover:brightness-95"
+          style={{ background: '#97B545', color: '#0F3714' }}
         >
           + Add job
         </Link>
       </div>
 
       {/* Search */}
-      <div className="mb-4">
+      <div className="relative mb-4">
+        <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(15,55,20,0.35)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
         <input
           type="search"
           placeholder="Search by job title or customer name…"
           value={search}
           onChange={e => setParam('search', e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
+          className="field-input pl-10"
         />
       </div>
 
       {/* Status tabs */}
-      <div className="flex gap-1 mb-4 flex-wrap">
+      <div className="flex gap-1.5 mb-4 overflow-x-auto scrollbar-none pb-0.5 flex-nowrap">
         {STATUS_TABS.map(tab => (
           <button
             key={tab.value}
             onClick={() => setParam('status', tab.value)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              status === tab.value
-                ? 'text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            style={status === tab.value ? { backgroundColor: '#0F3714' } : {}}
+            className="shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all"
+            style={status === tab.value
+              ? { background: '#0F3714', color: 'white' }
+              : { background: 'rgba(255,255,255,0.7)', color: 'rgba(15,55,20,0.6)' }
+            }
           >
             {tab.label}
           </button>
@@ -178,87 +186,84 @@ export default function JobList() {
       </div>
 
       {/* Sort row */}
-      <div className="flex gap-3 text-xs text-gray-500 mb-3">
-        <button onClick={() => toggleSort('scheduled_date')} className="hover:text-gray-800">
+      <div className="flex gap-3 text-xs mb-3" style={{ color: 'rgba(15,55,20,0.45)' }}>
+        <button onClick={() => toggleSort('scheduled_date')} className="hover:text-brand-dark transition-colors">
           Date {sort.startsWith('scheduled_date') ? (sort.endsWith('asc') ? '↑' : '↓') : '↕'}
         </button>
-        <button onClick={() => toggleSort('priority')} className="hover:text-gray-800">
+        <button onClick={() => toggleSort('priority')} className="hover:text-brand-dark transition-colors">
           Priority {sort === 'priority_desc' ? '↓' : '↕'}
+        </button>
+        <button onClick={() => setParam('sort', sort === 'due_by_asc' ? 'created_at_desc' : 'due_by_asc')} className="hover:text-brand-dark transition-colors">
+          Due By {sort === 'due_by_asc' ? '↑' : '↕'}
         </button>
       </div>
 
       {/* Loading */}
       {isLoading && (
         <div className="flex justify-center py-12">
-          <Spinner />
+          <Spinner className="w-6 h-6 text-brand-lime" />
         </div>
       )}
 
       {/* Empty */}
       {!isLoading && result?.data.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12" style={{ color: 'rgba(15,55,20,0.4)' }}>
           No jobs found.{' '}
-          <Link to="/jobs/new" className="underline" style={{ color: '#97B545' }}>
-            Add one?
-          </Link>
+          <Link to="/jobs/new" className="underline text-brand-lime">Add one?</Link>
         </div>
       )}
 
-      {/* Desktop table */}
       {!isLoading && (result?.data.length ?? 0) > 0 && (
         <>
-          <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200">
+          {/* Desktop table */}
+          <div className="hidden md:block table-card">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Customer</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Job</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Type</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Priority</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Logs</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Invoice</th>
-                  <th className="px-4 py-3" />
+                <tr className="thead-dark text-left">
+                  <th>Customer</th>
+                  <th>Job</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Date</th>
+                  <th>Due By</th>
+                  <th>Logs</th>
+                  <th>Invoice</th>
+                  <th />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-black/4">
                 {result?.data.map(job => (
-                  <tr key={job.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">
+                  <tr key={job.id} onClick={() => navigate(`/jobs/${job.id}`)} className="tr-hover cursor-pointer transition-colors">
+                    <td className="px-4 py-3 font-semibold text-brand-dark">
                       {toTitleCase(job.customer?.name ?? null)}
                     </td>
                     <td className="px-4 py-3 text-gray-700">{job.title}</td>
                     <td className="px-4 py-3">
-                      <span className="text-xs text-gray-500">{TYPE_LABELS[job.type]}</span>
+                      <span className="text-xs" style={{ color: 'rgba(15,55,20,0.5)' }}>{TYPE_LABELS[job.type]}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOURS[job.status]}`}>
+                      <span className={`badge ${STATUS_COLOURS[job.status]}`}>
                         {STATUS_LABELS[job.status]}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       {job.priority !== 'normal' && (
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PRIORITY_COLOURS[job.priority]}`}>
+                        <span className={`badge ${PRIORITY_COLOURS[job.priority]}`}>
                           {job.priority.charAt(0).toUpperCase() + job.priority.slice(1)}
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">
-                      {job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString('en-IE') : '—'}
+                    <td className="px-4 py-3 text-xs" style={{ color: 'rgba(15,55,20,0.5)' }}>
+                      {job.scheduled_date && job.status !== 'backlog' ? new Date(job.scheduled_date).toLocaleDateString('en-IE') : '—'}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{job.work_logs_count}</td>
+                    <td className="px-4 py-3">{dueBadge(job.due_by, job.status) ?? <span className="text-xs" style={{ color: 'rgba(15,55,20,0.3)' }}>—</span>}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: 'rgba(15,55,20,0.5)' }}>{job.work_logs_count}</td>
                     <td className="px-4 py-3">
                       <InvoiceTag job={job} />
                     </td>
                     <td className="px-4 py-3">
-                      <Link
-                        to={`/jobs/${job.id}`}
-                        className="text-xs font-medium hover:underline"
-                        style={{ color: '#97B545' }}
-                      >
-                        View
-                      </Link>
+                      <span className="text-xs font-semibold text-brand-lime">View →</span>
                     </td>
                   </tr>
                 ))}
@@ -269,29 +274,32 @@ export default function JobList() {
           {/* Mobile cards */}
           <div className="md:hidden space-y-3">
             {result?.data.map(job => (
-              <Link key={job.id} to={`/jobs/${job.id}`} className="block bg-white border border-gray-200 rounded-lg p-4">
+              <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)} className="row-card cursor-pointer active:opacity-80 transition-opacity">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{job.title}</p>
-                    <p className="text-sm text-gray-500 truncate">{toTitleCase(job.customer?.name ?? null)}</p>
+                    <p className="font-semibold text-brand-dark truncate">{job.title}</p>
+                    <p className="text-sm mt-0.5 truncate" style={{ color: 'rgba(15,55,20,0.55)' }}>
+                      {toTitleCase(job.customer?.name ?? null)}
+                    </p>
                   </div>
-                  <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOURS[job.status]}`}>
+                  <span className={`badge ${STATUS_COLOURS[job.status]}`}>
                     {STATUS_LABELS[job.status]}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 mt-2 flex-wrap text-xs text-gray-400">
+                <div className="flex items-center gap-2 mt-2.5 flex-wrap text-xs" style={{ color: 'rgba(15,55,20,0.45)' }}>
                   <span>{TYPE_LABELS[job.type]}</span>
                   {job.priority !== 'normal' && (
-                    <span className={`px-1.5 py-0.5 rounded-full ${PRIORITY_COLOURS[job.priority]}`}>
+                    <span className={`badge ${PRIORITY_COLOURS[job.priority]}`}>
                       {job.priority}
                     </span>
                   )}
-                  {job.scheduled_date && (
+                  {job.scheduled_date && job.status !== 'backlog' && (
                     <span>{new Date(job.scheduled_date).toLocaleDateString('en-IE')}</span>
                   )}
+                  {dueBadge(job.due_by, job.status)}
                   <InvoiceTag job={job} />
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </>
@@ -299,11 +307,11 @@ export default function JobList() {
 
       {/* Pagination */}
       {!isLoading && (result?.last_page ?? 1) > 1 && (
-        <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+        <div className="flex items-center justify-between mt-4 text-sm" style={{ color: 'rgba(15,55,20,0.5)' }}>
           <button
             disabled={page <= 1}
             onClick={() => setParam('page', String(page - 1))}
-            className="px-3 py-1 border rounded disabled:opacity-40"
+            className="px-3 py-1.5 rounded-lg border border-black/8 disabled:opacity-40 hover:bg-white/60 transition-colors"
           >
             ← Prev
           </button>
@@ -311,7 +319,7 @@ export default function JobList() {
           <button
             disabled={page >= (result?.last_page ?? 1)}
             onClick={() => setParam('page', String(page + 1))}
-            className="px-3 py-1 border rounded disabled:opacity-40"
+            className="px-3 py-1.5 rounded-lg border border-black/8 disabled:opacity-40 hover:bg-white/60 transition-colors"
           >
             Next →
           </button>

@@ -24,7 +24,7 @@ class RateCalculationService
         return $default;
     }
 
-    public function calculateRate(FieldJob $job, Customer $customer): float
+    public function calculateRate(FieldJob $job, Customer $customer, bool $hasPowerTools = false, bool $hasWasteDisposal = false): float
     {
         $card = $this->resolveRateCard($customer);
 
@@ -32,10 +32,10 @@ class RateCalculationService
             $rate = $card->maintenance_rate;
         } else {
             $rate = $card->base_rate;
-            if ($job->has_power_tools) {
+            if ($hasPowerTools) {
                 $rate += $card->power_tool_uplift;
             }
-            if ($job->has_waste_disposal) {
+            if ($hasWasteDisposal) {
                 $rate += $card->waste_uplift;
             }
         }

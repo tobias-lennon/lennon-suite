@@ -13,7 +13,7 @@
       background: #ffffff;
     }
 
-    .page { padding: 36px 40px; min-height: 100%; }
+    .page { padding: 36px 40px; }
 
     /* ── Header ── */
     .header {
@@ -121,16 +121,20 @@
     .items-table tbody td.right { text-align: right; }
     .items-table tbody td.muted { color: #6b7280; }
 
+    .pill-cell {
+      width: 1%;
+      white-space: nowrap;
+      vertical-align: middle;
+      padding-left: 7px;
+    }
     .type-pill {
       display: inline-block;
       font-size: 6.5px;
       font-weight: bold;
       text-transform: uppercase;
       letter-spacing: 0.8px;
-      padding: 1px 5px;
+      padding: 2px 5px;
       border-radius: 3px;
-      margin-left: 5px;
-      vertical-align: middle;
     }
     .pill-labour   { background: #dcfce7; color: #15803d; }
     .pill-material { background: #fef3c7; color: #92400e; }
@@ -309,18 +313,23 @@
       @php
         $labourItems   = $invoice->lineItems->where('type', 'labour');
         $materialItems = $invoice->lineItems->where('type', 'material');
+        $calloutItems  = $invoice->lineItems->where('type', 'callout');
       @endphp
 
-      @foreach($labourItems as $item)
-        <tr class="labour-row">
-          <td>
-            {{ $item->description }}
-            <span class="type-pill pill-labour">Labour</span>
+      @if($labourItems->isNotEmpty())
+        <tr>
+          <td colspan="3" style="padding: 4px 10px; font-size:7.5px; font-weight:bold; color:#0F3714; text-transform:uppercase; letter-spacing:1px; background:#eef6d6; border-top:1px solid #c8e08a;">
+            Labour
           </td>
-          <td class="right muted">{{ number_format($item->quantity, 1) }}h</td>
-          <td class="right">€{{ number_format($item->amount, 2) }}</td>
         </tr>
-      @endforeach
+        @foreach($labourItems as $item)
+          <tr class="labour-row">
+            <td>{{ $item->description }}</td>
+            <td class="right muted">{{ number_format($item->quantity, 2) }}h</td>
+            <td class="right">€{{ number_format($item->amount, 2) }}</td>
+          </tr>
+        @endforeach
+      @endif
 
       @if($materialItems->isNotEmpty())
         <tr>
@@ -330,11 +339,23 @@
         </tr>
         @foreach($materialItems as $item)
           <tr class="material-row">
-            <td>
-              {{ $item->description }}
-              <span class="type-pill pill-material">Material</span>
-            </td>
+            <td>{{ $item->description }}</td>
             <td class="right muted">{{ number_format($item->quantity, 1) }}</td>
+            <td class="right">€{{ number_format($item->amount, 2) }}</td>
+          </tr>
+        @endforeach
+      @endif
+
+      @if($calloutItems->isNotEmpty())
+        <tr>
+          <td colspan="3" style="padding: 4px 10px; font-size:7.5px; font-weight:bold; color:#1e40af; text-transform:uppercase; letter-spacing:1px; background:#eff6ff; border-top:1px solid #bfdbfe;">
+            Additional Charges
+          </td>
+        </tr>
+        @foreach($calloutItems as $item)
+          <tr style="background:#f0f7ff;">
+            <td>{{ $item->description }}</td>
+            <td class="right muted">—</td>
             <td class="right">€{{ number_format($item->amount, 2) }}</td>
           </tr>
         @endforeach
@@ -378,6 +399,17 @@
     </tr>
   </table>
 
+  {{-- ── Loyalty Snapshot (maintenance jobs only) ── --}}
+  @if($invoice->loyalty_hours_earned !== null && $invoice->loyalty_balance_after !== null)
+  <div style="margin-top:14px; background:#f3f8e8; border:1.5px solid #c8e08a; border-radius:5px; padding:8px 12px;">
+    <span style="font-size:7.5px; font-weight:bold; color:#0F3714; text-transform:uppercase; letter-spacing:1px;">&#9733; Maintenance Loyalty Programme</span>
+    <div style="font-size:8.5px; color:#444; margin-top:3px; line-height:1.6;">
+      You earned <strong>{{ number_format($invoice->loyalty_hours_earned, 1) }} hrs</strong> on this job &mdash;
+      current balance: <strong>{{ number_format($invoice->loyalty_balance_after, 1) }} / 60 hrs</strong> towards your next free visit.
+    </div>
+  </div>
+  @endif
+
   {{-- ── Payment Section ── --}}
   <div class="payment-section">
     <table class="payment-grid" cellpadding="0" cellspacing="0">
@@ -412,7 +444,6 @@
             <div class="bank-details">
               <strong>Bank Transfer:</strong><br>
               Account Name: Lennon Landscaping<br>
-              Bank: AIB<br>
               IBAN: IE22 AIBK 9361 5417 3460 64<br>
               BIC: AIBKIE2D
             </div>

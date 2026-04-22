@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CompanySetting;
 use App\Models\Customer;
 use App\Models\FieldJob;
 use App\Models\LoyaltyCredit;
@@ -80,8 +81,9 @@ class RateCalculationService
     public function checkMaintenanceLoyalty(Customer $customer, float $hoursAdded): void
     {
         $customer->maintenance_hours_balance += $hoursAdded;
+        $threshold = (int) CompanySetting::get('loyalty_threshold_hours', 60);
 
-        while ($customer->maintenance_hours_balance >= 60) {
+        while ($customer->maintenance_hours_balance >= $threshold) {
             LoyaltyCredit::create([
                 'customer_id'      => $customer->id,
                 'hours_at_trigger' => $customer->maintenance_hours_balance,
@@ -90,7 +92,7 @@ class RateCalculationService
                 'status'           => 'pending',
             ]);
 
-            $customer->maintenance_hours_balance -= 60;
+            $customer->maintenance_hours_balance -= $threshold;
         }
 
         $customer->save();

@@ -18,6 +18,7 @@ import LeadForm from './pages/leads/LeadForm'
 import InvoiceList from './pages/invoices/InvoiceList'
 import InvoiceDetail from './pages/invoices/InvoiceDetail'
 import Profile from './pages/Profile'
+import Settings from './pages/Settings'
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
             <Route path="/invoices" element={<InvoiceList />} />
             <Route path="/invoices/:id" element={<InvoiceDetail />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

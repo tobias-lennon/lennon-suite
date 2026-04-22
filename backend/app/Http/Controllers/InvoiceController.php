@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CompanySetting;
 use App\Models\FieldJob;
 use App\Models\Invoice;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -14,16 +15,15 @@ class InvoiceController extends Controller
 {
     private function generateInvoiceNumber(): string
     {
-        $year = now()->year;
+        $year   = now()->year;
+        $prefix = CompanySetting::get('invoice_prefix', 'LL');
 
-        // Extract only the sequence segment (after the last dash) — avoids picking up year digits
         $maxSeq = Invoice::selectRaw("MAX(CAST(SUBSTRING_INDEX(invoice_number, '-', -1) AS UNSIGNED)) as max_seq")
             ->value('max_seq');
 
-        // Start from at least 103 to pick up from existing business numbering
         $nextNum = max((int) $maxSeq + 1, 103);
 
-        return "LL-{$year}-" . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
+        return "{$prefix}-{$year}-" . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
     }
 
     public function index(Request $request): JsonResponse
@@ -110,7 +110,7 @@ class InvoiceController extends Controller
         $discountPct    = (float) ($job->customer?->discount_pct ?? 0);
         $discountAmount = round($subtotal * ($discountPct / 100), 2);
         $vatBase        = round($subtotal - $discountAmount, 2);
-        $vatRate        = 13.5;
+        $vatRate        = (float) CompanySetting::get('vat_rate', 13.5);
         $vatAmount      = round($vatBase * ($vatRate / 100), 2);
         $totalDue       = round($vatBase + $vatAmount, 2);
 
@@ -131,7 +131,7 @@ class InvoiceController extends Controller
                 'field_job_id'         => $job->id,
                 'customer_id'          => $job->customer_id,
                 'issued_date'          => now()->toDateString(),
-                'due_date'             => now()->addDays($data['due_days'] ?? 30)->toDateString(),
+                'due_date'             => now()->addDays($data['due_days'] ?? CompanySetting::get('invoice_due_days', 30))->toDateString(),
                 'status'               => 'draft',
                 'subtotal'             => $subtotal,
                 'discount_pct'         => $discountPct,

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomerController;
@@ -62,6 +63,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/invoices/{invoice}/payment', [InvoiceController::class, 'recordPayment']);
     Route::patch('/invoices/{invoice}/status', [InvoiceController::class, 'updateStatus']);
     Route::apiResource('/invoices', InvoiceController::class)->only(['index', 'store', 'show', 'destroy']);
+
+    // Company settings
+    Route::get('/settings',   [SettingsController::class, 'show']);
+    Route::patch('/settings', [SettingsController::class, 'update']);
 
     // Reference data
     Route::get('/employees', [EmployeeController::class, 'index']);

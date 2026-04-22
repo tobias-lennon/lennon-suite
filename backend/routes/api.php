@@ -18,61 +18,75 @@ use Illuminate\Support\Facades\Route;
 Route::post('/auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:10,1');
 
-// Protected
+// All authenticated users
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
-    Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::get('/auth/me',     [AuthController::class, 'me']);
 
-    // Profile
+    // Profile (own account — any role)
     Route::patch('/users/me/password', [UserController::class, 'updatePassword']);
     Route::post('/users/me/avatar',    [UserController::class, 'updateAvatar']);
     Route::delete('/users/me/avatar',  [UserController::class, 'removeAvatar']);
 
-    Route::get('/customers/stats', [CustomerController::class, 'stats']);
-    Route::get('/customers/{customer}/history', [CustomerController::class, 'history']);
-    Route::patch('/customers/{customer}/archive', [CustomerController::class, 'archive']);
-    Route::apiResource('/customers', CustomerController::class);
+    // Read-only access (admin + field)
+    Route::middleware('role:admin,field')->group(function () {
+        Route::get('/customers/stats',              [CustomerController::class, 'stats']);
+        Route::get('/customers/{customer}/history', [CustomerController::class, 'history']);
+        Route::apiResource('/customers', CustomerController::class)->only(['index', 'show']);
 
-    // Leads
-    Route::post('/leads/{lead}/convert', [LeadController::class, 'convert']);
-    Route::apiResource('/leads', LeadController::class);
+        Route::apiResource('/leads', LeadController::class)->only(['index', 'show']);
 
-    // Jobs
-    Route::patch('/jobs/{job}/status', [JobController::class, 'updateStatus']);
-    Route::apiResource('/jobs', JobController::class)->parameters(['jobs' => 'job']);
+        Route::patch('/jobs/{job}/status', [JobController::class, 'updateStatus']);
+        Route::apiResource('/jobs', JobController::class)
+            ->parameters(['jobs' => 'job'])
+            ->only(['index', 'show']);
 
-    // Work logs (nested under jobs)
-    Route::get('/jobs/{job}/logs', [WorkLogController::class, 'index']);
-    Route::post('/jobs/{job}/logs', [WorkLogController::class, 'store']);
-    Route::get('/jobs/{job}/logs/{log}', [WorkLogController::class, 'show']);
-    Route::patch('/jobs/{job}/logs/{log}', [WorkLogController::class, 'update']);
-    Route::delete('/jobs/{job}/logs/{log}', [WorkLogController::class, 'destroy']);
+        Route::get('/jobs/{job}/logs',         [WorkLogController::class, 'index']);
+        Route::get('/jobs/{job}/logs/{log}',   [WorkLogController::class, 'show']);
 
-    // Work log entries and materials (nested under log ID)
-    Route::post('/logs/{log}/entries', [WorkLogEntryController::class, 'store']);
-    Route::patch('/logs/{log}/entries/{entry}', [WorkLogEntryController::class, 'update']);
-    Route::delete('/logs/{log}/entries/{entry}', [WorkLogEntryController::class, 'destroy']);
+        Route::apiResource('/invoices', InvoiceController::class)->only(['index', 'show']);
+        Route::get('/invoices/{invoice}/download', [InvoiceController::class, 'downloadPdf']);
+        Route::get('/invoices/{invoice}/receipt',  [InvoiceController::class, 'downloadReceipt']);
 
-    Route::post('/logs/{log}/materials', [MaterialController::class, 'store']);
-    Route::patch('/logs/{log}/materials/{material}', [MaterialController::class, 'update']);
-    Route::delete('/logs/{log}/materials/{material}', [MaterialController::class, 'destroy']);
+        Route::get('/settings',    [SettingsController::class, 'show']);
+        Route::get('/employees',   [EmployeeController::class, 'index']);
+        Route::get('/rate-cards',  [RateCardController::class, 'index']);
+    });
 
-    // Invoices
-    Route::get('/invoices/{invoice}/download', [InvoiceController::class, 'downloadPdf']);
-    Route::get('/invoices/{invoice}/receipt', [InvoiceController::class, 'downloadReceipt']);
-    Route::post('/invoices/{invoice}/payment', [InvoiceController::class, 'recordPayment']);
-    Route::patch('/invoices/{invoice}/status', [InvoiceController::class, 'updateStatus']);
-    Route::apiResource('/invoices', InvoiceController::class)->only(['index', 'store', 'show', 'destroy']);
+    // Write access — field staff can log work
+    Route::middleware('role:admin,field')->group(function () {
+        Route::post('/jobs/{job}/logs',            [WorkLogController::class, 'store']);
+        Route::patch('/jobs/{job}/logs/{log}',     [WorkLogController::class, 'update']);
+        Route::delete('/jobs/{job}/logs/{log}',    [WorkLogController::class, 'destroy']);
 
-    // Company settings
-    Route::get('/settings',   [SettingsController::class, 'show']);
-    Route::patch('/settings', [SettingsController::class, 'update']);
+        Route::post('/logs/{log}/entries',                      [WorkLogEntryController::class, 'store']);
+        Route::patch('/logs/{log}/entries/{entry}',             [WorkLogEntryController::class, 'update']);
+        Route::delete('/logs/{log}/entries/{entry}',            [WorkLogEntryController::class, 'destroy']);
 
-    // Reference data
-    Route::get('/employees', [EmployeeController::class, 'index']);
-    Route::get('/rate-cards', [RateCardController::class, 'index']);
+        Route::post('/logs/{log}/materials',                    [MaterialController::class, 'store']);
+        Route::patch('/logs/{log}/materials/{material}',        [MaterialController::class, 'update']);
+        Route::delete('/logs/{log}/materials/{material}',       [MaterialController::class, 'destroy']);
+    });
 
-    // Customer discount and rates
-    Route::patch('/customers/{customer}/discount', [CustomerController::class, 'setDiscount']);
-    Route::patch('/customers/{customer}/rates',    [CustomerController::class, 'setRates']);
+    // Admin only
+    Route::middleware('role:admin')->group(function () {
+        Route::patch('/customers/{customer}/archive',   [CustomerController::class, 'archive']);
+        Route::apiResource('/customers', CustomerController::class)->only(['store', 'update', 'destroy']);
+
+        Route::patch('/customers/{customer}/discount',  [CustomerController::class, 'setDiscount']);
+        Route::patch('/customers/{customer}/rates',     [CustomerController::class, 'setRates']);
+
+        Route::apiResource('/leads', LeadController::class)->only(['store', 'update', 'destroy']);
+        Route::post('/leads/{lead}/convert',            [LeadController::class, 'convert']);
+
+        Route::apiResource('/jobs', JobController::class)
+            ->parameters(['jobs' => 'job'])
+            ->only(['store', 'update', 'destroy']);
+
+        Route::apiResource('/invoices', InvoiceController::class)->only(['store', 'destroy']);
+        Route::post('/invoices/{invoice}/payment',      [InvoiceController::class, 'recordPayment']);
+        Route::patch('/invoices/{invoice}/status',      [InvoiceController::class, 'updateStatus']);
+
+        Route::patch('/settings', [SettingsController::class, 'update']);
+    });
 });

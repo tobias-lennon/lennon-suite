@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node -e \"const fs=require('fs'),path=require('path'),d='../backend/public/assets';if(fs.existsSync(d))fs.readdirSync(d).forEach(f=>fs.unlinkSync(path.join(d,f)))\" && tsc -b && vite build",
+    "build": "node -e \"const fs=require('fs'),path=require('path'),d='../backend/public/assets';if(fs.existsSync(d))fs.readdirSync(d).forEach(f=>fs.unlinkSync(path.join(d,f)));const v=JSON.parse(fs.readFileSync('./package.json','utf-8')).version;fs.writeFileSync('../backend/public/version.json',JSON.stringify({version:v}))\" && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",

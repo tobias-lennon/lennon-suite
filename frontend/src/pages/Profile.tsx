@@ -47,42 +47,23 @@ export default function Profile() {
   }
 
   // ── App update ──────────────────────────────────────────────────
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'up-to-date'>('idle')
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'up-to-date' | 'available'>('idle')
 
   async function handleCheckUpdate() {
     setUpdateStatus('checking')
     try {
-      const reg = await navigator.serviceWorker?.getRegistration()
-      if (!reg) throw new Error('no sw')
-      const registration = reg
+      const res = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' })
+      const { version: serverVersion } = await res.json()
 
-      function applyWaiting() {
-        const sw = registration.waiting as ServiceWorker
-        sw.postMessage({ type: 'SKIP_WAITING' })
+      if (serverVersion !== __APP_VERSION__) {
+        setUpdateStatus('available')
+        // Tell SW to skip waiting if one is pending, then reload
+        const reg = await navigator.serviceWorker?.getRegistration()
+        reg?.waiting?.postMessage({ type: 'SKIP_WAITING' })
         window.location.reload()
+        return
       }
-
-      // Already waiting — apply immediately
-      if (reg.waiting) { applyWaiting(); return }
-
-      // Wait for updatefound → installing → installed, then apply
-      await new Promise<void>(resolve => {
-        const detectTimeout = setTimeout(resolve, 6000) // give up if no new SW found within 6s
-
-        reg.addEventListener('updatefound', () => {
-          clearTimeout(detectTimeout) // new SW detected — wait as long as needed for install
-          const sw = reg.installing
-          if (!sw) { resolve(); return }
-          sw.addEventListener('statechange', () => {
-            if (sw.state === 'installed' || sw.state === 'redundant') resolve()
-          })
-        }, { once: true })
-
-        reg.update().catch(resolve)
-      })
-
-      if (reg.waiting) { applyWaiting(); return }
-    } catch { /* no SW in dev */ }
+    } catch { /* offline or no version.json */ }
 
     setUpdateStatus('up-to-date')
     setTimeout(() => setUpdateStatus('idle'), 3000)

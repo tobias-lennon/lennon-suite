@@ -61,6 +61,11 @@ export default function Settings() {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
+  function normaliseEircode(raw: string): string {
+    const cleaned = raw.trim().toUpperCase().replace(/\s+/g, '')
+    return cleaned.length === 7 ? `${cleaned.slice(0, 3)} ${cleaned.slice(3)}` : cleaned
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setIsSaving(true)
@@ -186,6 +191,7 @@ export default function Settings() {
                 type="text"
                 value={form.eircode}
                 onChange={e => set('eircode', e.target.value)}
+                onBlur={e => set('eircode', normaliseEircode(e.target.value))}
                 className="field-input"
                 placeholder="P51 AB12"
               />

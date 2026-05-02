@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\CompanySetting;
+use App\Services\GeocodingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SettingsController extends Controller
 {
+    public function __construct(private GeocodingService $geocoding) {}
+
     public function show(): JsonResponse
     {
         return response()->json(CompanySetting::instance());
@@ -33,7 +36,16 @@ class SettingsController extends Controller
         ]);
 
         $settings = CompanySetting::instance();
+        $oldEircode = $settings->eircode;
         $settings->update($data);
+
+        $newEircode = $settings->fresh()->eircode;
+        if ($newEircode && $newEircode !== $oldEircode) {
+            $coords = $this->geocoding->geocodeEircode($newEircode);
+            if ($coords) {
+                $settings->update(['hq_latitude' => $coords['latitude'], 'hq_longitude' => $coords['longitude']]);
+            }
+        }
 
         return response()->json($settings->fresh());
     }

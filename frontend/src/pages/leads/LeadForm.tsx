@@ -89,7 +89,7 @@ export default function LeadForm() {
           eircode:             l.eircode ?? '',
           source:              l.source ?? 'other',
           status:              l.status ?? 'new',
-          requires_site_visit: l.requires_site_visit ?? false,
+          requires_site_visit: !!l.requires_site_visit,
           notes:               l.notes ?? '',
         })
       })

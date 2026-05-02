@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../../lib/api'
 import { toTitleCase } from '../../lib/formatters'
+import { usePermissions } from '../../hooks/usePermissions'
 import Spinner from '../../components/Spinner'
 import ConfirmDialog from '../../components/ConfirmDialog'
 
@@ -84,6 +85,7 @@ async function downloadBlob(url: string, filename: string) {
 export default function InvoiceDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { canManageInvoice } = usePermissions()
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
@@ -197,7 +199,7 @@ export default function InvoiceDetail() {
 
       {/* Header */}
       <div className="mb-6">
-        <button onClick={() => navigate(-1)} className="text-sm transition-colors" style={{ color: 'rgba(15,55,20,0.45)' }}>
+        <button onClick={() => navigate(-1)} className="md:hidden text-sm transition-colors" style={{ color: 'rgba(15,55,20,0.45)' }}>
           ← Back
         </button>
         <div className="flex items-start justify-between gap-4 mt-1">
@@ -259,7 +261,7 @@ export default function InvoiceDetail() {
           </button>
         )}
 
-        {invoice.status !== 'paid' && (
+        {invoice.status !== 'paid' && canManageInvoice && (
           <button
             onClick={() => setShowPaymentForm(v => !v)}
             className="min-w-[140px] flex items-center justify-center px-3 py-2 text-sm font-medium rounded-lg text-white"
@@ -269,7 +271,7 @@ export default function InvoiceDetail() {
           </button>
         )}
 
-        {invoice.status === 'paid' && (
+        {invoice.status === 'paid' && canManageInvoice && (
           <button
             disabled={statusUpdating}
             onClick={() => updateStatus('sent')}
@@ -286,7 +288,7 @@ export default function InvoiceDetail() {
       </div>
 
       {/* Send flow hint — only when not yet sent */}
-      {invoice.status === 'draft' && (
+      {invoice.status === 'draft' && canManageInvoice && (
         <div className="flex items-center gap-3 mb-6 p-3 rounded-lg" style={{ background: 'rgba(15,55,20,0.05)', border: '1px solid rgba(15,55,20,0.12)' }}>
           <div className="text-sm" style={{ color: '#0F3714' }}>
             <span className="font-medium">Next step:</span> Download the invoice above, send it to the customer, then come back and record payment when received.
@@ -308,7 +310,7 @@ export default function InvoiceDetail() {
       )}
 
       {/* Payment recording form */}
-      {showPaymentForm && (
+      {showPaymentForm && canManageInvoice && (
         <div className="bg-[#f9fdf4] border border-[#c8e08a] rounded-lg p-5 mb-6">
           <h3 className="text-sm font-semibold text-[#0F3714] mb-4">Record Payment</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -605,11 +607,13 @@ export default function InvoiceDetail() {
       })()}
 
       {/* Danger zone */}
-      <div className="border-t border-gray-200 pt-6">
-        <button onClick={() => setShowDeleteDialog(true)} className="text-sm text-danger">
-          Delete invoice
-        </button>
-      </div>
+      {canManageInvoice && (
+        <div className="border-t border-gray-200 pt-6">
+          <button onClick={() => setShowDeleteDialog(true)} className="text-sm text-danger">
+            Delete invoice
+          </button>
+        </div>
+      )}
 
     </div>
   )

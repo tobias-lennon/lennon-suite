@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../lib/api'
 import Spinner from '../components/Spinner'
+import WeatherWidget from '../components/WeatherWidget'
+import { useCountUp } from '../hooks/useCountUp'
 
 interface Stats {
   total: number
@@ -26,19 +28,24 @@ interface StatCardProps {
   to?: string
   accent: string
   textAccent?: string
+  animDelay?: number
 }
 
-function StatCard({ label, value, sub, to, accent, textAccent }: StatCardProps) {
+function StatCard({ label, value, sub, to, accent, textAccent, animDelay = 0 }: StatCardProps) {
+  const numTarget = typeof value === 'number' ? value : null
+  const counted = useCountUp(numTarget)
+  const displayValue = numTarget !== null ? (counted ?? 0) : value
+
   const inner = (
-    <div className="relative overflow-hidden rounded-2xl bg-cream-card p-5 border border-black/5"
-         style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+    <div className="relative overflow-hidden rounded-2xl bg-cream-card p-5 border border-black/5 page-enter"
+         style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', animationDelay: `${animDelay}ms` }}>
       {/* Accent stripe */}
       <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl" style={{ backgroundColor: accent }} />
       <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: accent }}>
         {label}
       </p>
       <p className="text-4xl font-bold leading-none" style={{ color: textAccent ?? '#0F3714' }}>
-        {value}
+        {displayValue}
       </p>
       {sub && <p className="text-[11px] text-gray-400 mt-1.5">{sub}</p>}
     </div>
@@ -106,6 +113,11 @@ export default function Dashboard() {
         </p>
       </div>
 
+      {/* ── Weather ────────────────────────────────────────────────── */}
+      <div className="mb-6">
+        <WeatherWidget />
+      </div>
+
       {/* ── Customer stats ─────────────────────────────────────────── */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-3">
@@ -124,10 +136,10 @@ export default function Dashboard() {
             ))
           ) : (
             <>
-              <StatCard label="Total"       value={stats?.total       ?? '—'} accent="#97B545" to="/customers" />
-              <StatCard label="Residential" value={stats?.residential ?? '—'} accent="#1D5823" to="/customers?type=residential" />
-              <StatCard label="Commercial"  value={stats?.commercial  ?? '—'} accent="#DDB01D" textAccent="#0F3714" to="/customers?type=commercial" />
-              <StatCard label="With Email"  value={stats?.with_email  ?? '—'} accent="#F4BE29" sub="reachable" to="/customers?has_email=1" />
+              <StatCard label="Total"       value={stats?.total       ?? '—'} accent="#97B545" to="/customers"                animDelay={60}  />
+              <StatCard label="Residential" value={stats?.residential ?? '—'} accent="#1D5823" to="/customers?type=residential" animDelay={120} />
+              <StatCard label="Commercial"  value={stats?.commercial  ?? '—'} accent="#DDB01D" textAccent="#0F3714" to="/customers?type=commercial" animDelay={180} />
+              <StatCard label="With Email"  value={stats?.with_email  ?? '—'} accent="#F4BE29" sub="reachable" to="/customers?has_email=1"          animDelay={240} />
             </>
           )}
         </div>

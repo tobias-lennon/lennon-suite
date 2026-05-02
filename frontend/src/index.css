@@ -31,9 +31,24 @@ input, textarea, select {
 
 body { cursor: default; }
 
+/* ── Page / card entrance animation ──────────────────────────────────────── */
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Shared design tokens (in @layer components so Tailwind utilities override) ── */
 
 @layer components {
+
+  .page-enter {
+    animation: fadeSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .anim-delay-1 { animation-delay: 60ms; }
+  .anim-delay-2 { animation-delay: 130ms; }
+  .anim-delay-3 { animation-delay: 210ms; }
+  .anim-delay-4 { animation-delay: 300ms; }
 
   /* Card panel — cream tinted, subtle shadow */
   .card {

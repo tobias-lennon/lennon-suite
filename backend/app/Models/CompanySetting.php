@@ -16,6 +16,8 @@ class CompanySetting extends Model
         'city',
         'county',
         'eircode',
+        'hq_latitude',
+        'hq_longitude',
         'vat_rate',
         'invoice_due_days',
         'invoice_prefix',
@@ -28,6 +30,8 @@ class CompanySetting extends Model
         'invoice_due_days'        => 'integer',
         'loyalty_threshold_hours' => 'integer',
         'target_billable_days'    => 'integer',
+        'hq_latitude'             => 'float',
+        'hq_longitude'            => 'float',
     ];
 
     // Always returns the single settings row

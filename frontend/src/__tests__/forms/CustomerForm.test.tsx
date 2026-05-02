@@ -78,13 +78,13 @@ describe('CustomerForm — Add mode', () => {
     renderAddForm()
     await user.type(await screen.findByPlaceholderText('Full name'), 'Seamus Buckley')
     await user.type(screen.getByPlaceholderText('email@…'), 'seamus@test.ie')
-    await user.type(screen.getByPlaceholderText('+353…'), '087 123 4567')
+    await user.type(screen.getByPlaceholderText('+353 89 123 4567'), '087 123 4567')
     await user.click(screen.getByRole('button', { name: /create customer|save changes/i }))
     await waitFor(() => {
       expect(captured).toMatchObject({
         name: 'Seamus Buckley',
         email: 'seamus@test.ie',
-        phone: '087 123 4567',
+        phone: '+353871234567',
       })
     })
   })
@@ -118,7 +118,7 @@ describe('CustomerForm — Edit mode', () => {
 
   it('pre-fills phone', async () => {
     renderEditForm()
-    expect(await screen.findByDisplayValue('087 123 4567')).toBeInTheDocument()
+    expect(await screen.findByDisplayValue('+353871234567')).toBeInTheDocument()
   })
 
   it('pre-fills address fields', async () => {

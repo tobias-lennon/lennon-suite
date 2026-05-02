@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\ContactController;
+use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuthController;
@@ -10,6 +12,7 @@ use App\Http\Controllers\JobController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\RateCardController;
+use App\Http\Controllers\WeatherController;
 use App\Http\Controllers\WorkLogController;
 use App\Http\Controllers\WorkLogEntryController;
 use Illuminate\Support\Facades\Route;
@@ -51,6 +54,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/settings',    [SettingsController::class, 'show']);
         Route::get('/employees',   [EmployeeController::class, 'index']);
         Route::get('/rate-cards',  [RateCardController::class, 'index']);
+
+        Route::get('/weather',                          [WeatherController::class, 'hq']);
+        Route::get('/weather/customers/{customer}',     [WeatherController::class, 'forCustomer']);
+
+        Route::get('/schedule',                         [ScheduleController::class, 'week']);
+        Route::patch('/schedule/jobs/{job}/date',       [ScheduleController::class, 'updateDate']);
+
+        Route::apiResource('/contacts', ContactController::class)->only(['index', 'show']);
     });
 
     // Write access — field staff can log work
@@ -88,5 +99,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/invoices/{invoice}/status',      [InvoiceController::class, 'updateStatus']);
 
         Route::patch('/settings', [SettingsController::class, 'update']);
+
+        Route::apiResource('/contacts', ContactController::class)->only(['store', 'update', 'destroy']);
     });
 });

@@ -22,6 +22,9 @@ class Customer extends Model
         'discount_pct',
         'default_callout_fee',
         'maintenance_hours_balance',
+        'minutes_from_hq',
+        'latitude',
+        'longitude',
     ];
 
     protected function casts(): array
@@ -32,6 +35,9 @@ class Customer extends Model
             'discount_pct'               => 'float',
             'default_callout_fee'        => 'float',
             'maintenance_hours_balance'  => 'float',
+            'minutes_from_hq'            => 'integer',
+            'latitude'                   => 'float',
+            'longitude'                  => 'float',
         ];
     }
 

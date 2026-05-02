@@ -7,3 +7,4 @@ desktop.ini
 
 # Server credential files — never commit
 backend/.env.server
+deploy.py

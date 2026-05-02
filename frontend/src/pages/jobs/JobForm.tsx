@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../../lib/api'
+import { toTitleCase } from '../../lib/formatters'
 import Spinner from '../../components/Spinner'
 
 interface CustomerOption {
@@ -221,7 +222,7 @@ export default function JobForm() {
 
     const payload = {
       ...form,
-      title: cleanText(form.title),
+      title: toTitleCase(form.title.trim().replace(/\s+/g, ' ')) ?? form.title.trim(),
       description: form.description ? cleanText(form.description) : null,
       notes: form.notes ? cleanText(form.notes) : null,
       customer_id: form.customer_id ? Number(form.customer_id) : null,

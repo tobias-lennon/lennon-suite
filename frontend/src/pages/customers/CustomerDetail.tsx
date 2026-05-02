@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../../lib/api'
 import { toTitleCase, formatPhone, phoneHref } from '../../lib/formatters'
+import { usePermissions } from '../../hooks/usePermissions'
 import Spinner from '../../components/Spinner'
 
 interface Customer {
@@ -13,6 +13,7 @@ interface Customer {
   email: string | null
   notes: string | null
   rating: number | null
+  minutes_from_hq: number | null
   discount_pct: number
   default_callout_fee: number | null
   maintenance_hours_balance: number
@@ -46,10 +47,6 @@ interface JobHistoryItem {
 interface JobHistory {
   stats: JobHistoryStats
   jobs: JobHistoryItem[]
-}
-
-function FieldLabel({ children }: { children: ReactNode }) {
-  return <p className="section-label">{children}</p>
 }
 
 function typeStyle(type: string) {
@@ -96,16 +93,11 @@ function formatDate(dateStr: string | null) {
 export default function CustomerDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { canEditCustomer } = usePermissions()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [history, setHistory] = useState<JobHistory | null>(null)
   const [historyLoading, setHistoryLoading] = useState(true)
-  const [editingDiscount, setEditingDiscount] = useState(false)
-  const [discountInput, setDiscountInput] = useState('')
-  const [savingDiscount, setSavingDiscount] = useState(false)
-  const [editingCallout, setEditingCallout] = useState(false)
-  const [calloutInput, setCalloutInput] = useState('')
-  const [savingCallout, setSavingCallout] = useState(false)
 
   useEffect(() => {
     api.get(`/customers/${id}`)
@@ -122,25 +114,6 @@ export default function CustomerDetail() {
     if (!confirm(`Archive ${customer?.name}? They'll be hidden from your customer list but their data is kept.`)) return
     await api.patch(`/customers/${id}/archive`)
     navigate('/customers')
-  }
-
-  async function saveDiscount() {
-    if (!customer) return
-    setSavingDiscount(true)
-    const res = await api.patch(`/customers/${id}/discount`, { discount_pct: parseFloat(discountInput) || 0 })
-    setCustomer(prev => prev ? { ...prev, discount_pct: res.data.discount_pct } : prev)
-    setEditingDiscount(false)
-    setSavingDiscount(false)
-  }
-
-  async function saveCallout() {
-    if (!customer) return
-    setSavingCallout(true)
-    const fee = calloutInput.trim() === '' ? null : parseFloat(calloutInput)
-    const res = await api.patch(`/customers/${id}/rates`, { default_callout_fee: fee })
-    setCustomer(prev => prev ? { ...prev, default_callout_fee: res.data.default_callout_fee } : prev)
-    setEditingCallout(false)
-    setSavingCallout(false)
   }
 
   async function handleDelete() {
@@ -169,226 +142,202 @@ export default function CustomerDetail() {
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto">
 
-      {/* Back */}
-      <button onClick={() => navigate(-1)} className="text-sm flex items-center gap-1 mb-6 transition-colors hover:text-brand-dark" style={{ color: 'rgba(15,55,20,0.45)' }}>
+      {/* Back — mobile only */}
+      <button onClick={() => navigate(-1)} className="md:hidden text-sm flex items-center gap-1 mb-5 transition-colors hover:text-brand-dark" style={{ color: 'rgba(15,55,20,0.45)' }}>
         ← Back
       </button>
 
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-start justify-between gap-4">
+      {/* Profile card */}
+      <div className="rounded-3xl overflow-hidden mb-4" style={{ boxShadow: '0 2px 16px rgba(15,55,20,0.08)' }}>
+
+        {/* Zone 1 — Header */}
+        <div className="px-6 py-5 flex items-start justify-between gap-4" style={{ background: '#0F3714' }}>
           <div>
-            <h1 className="text-2xl font-bold text-brand-dark">{toTitleCase(customer.name)}</h1>
+            <h1 className="text-2xl font-black text-white leading-tight">{toTitleCase(customer.name)}</h1>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               {customer.type && (
-                <span className={`inline-flex text-xs font-semibold px-2.5 py-1 rounded-full ${
+                <span className={`inline-flex text-xs font-bold px-2.5 py-1 rounded-full ${
                   customer.type === 'commercial'
-                    ? 'bg-[#DDB01D]/15 text-[#a07f00]'
-                    : 'bg-[#97B545]/15 text-[#5a7020]'
+                    ? 'bg-[#DDB01D]/20 text-[#DDB01D]'
+                    : 'bg-[#97B545]/20 text-[#97B545]'
                 }`}>
                   {customer.type.charAt(0).toUpperCase() + customer.type.slice(1)}
                 </span>
               )}
               {stats && (
-                <span className={`badge ${
-                  stats.is_returning
-                    ? 'badge-complete'
-                    : stats.total_jobs > 0
-                      ? 'badge-backlog'
-                      : 'bg-gray-100 text-gray-400'
+                <span className={`inline-flex text-xs font-bold px-2.5 py-1 rounded-full ${
+                  stats.total_jobs === 0
+                    ? 'bg-white/10 text-white/40'
+                    : stats.is_returning
+                      ? 'bg-[#97B545]/20 text-[#97B545]'
+                      : 'bg-white/10 text-white/60'
                 }`}>
                   {stats.total_jobs === 0 ? 'No jobs yet' : stats.is_returning ? 'Returning' : 'One-off'}
                 </span>
               )}
             </div>
           </div>
-          <Link
-            to={`/customers/${id}/edit`}
-            className="text-sm font-semibold px-4 py-2 rounded-lg border border-black/8 hover:bg-white/70 text-brand-dark transition-colors"
-          >
-            Edit
-          </Link>
-        </div>
-      </div>
-
-      {/* Details card */}
-      <div className="card grid grid-cols-1 md:grid-cols-2 gap-5 p-5 md:p-6 mb-4">
-
-        <div>
-          <FieldLabel>Phone</FieldLabel>
-          {customer.phone ? (
-            <a href={`tel:${phoneHref(customer.phone)}`} className="text-sm text-brand-lime hover:underline font-medium">
-              {formatPhone(customer.phone)}
-            </a>
-          ) : (
-            <p className="text-sm" style={{ color: 'rgba(0,0,0,0.25)' }}>—</p>
-          )}
-        </div>
-
-        <div>
-          <FieldLabel>Email</FieldLabel>
-          {customer.email ? (
-            <a href={`mailto:${customer.email}`} className="text-sm text-brand-lime hover:underline break-all font-medium">
-              {customer.email.toLowerCase()}
-            </a>
-          ) : (
-            <p className="text-sm" style={{ color: 'rgba(0,0,0,0.25)' }}>—</p>
-          )}
-        </div>
-
-        <div>
-          <FieldLabel>Address</FieldLabel>
-          {addressLines.length > 0 ? (
-            <p className="text-sm text-brand-dark leading-relaxed">
-              {addressLines.map((line, i) => (
-                <span key={i}>{line}{i < addressLines.length - 1 && <br />}</span>
-              ))}
-            </p>
-          ) : (
-            <p className="text-sm" style={{ color: 'rgba(0,0,0,0.25)' }}>—</p>
-          )}
-        </div>
-
-        <div>
-          <FieldLabel>Eircode</FieldLabel>
-          {addr?.postcode ? (
-            <a
-              href={`https://maps.google.com/?q=${encodeURIComponent(addr.postcode)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-brand-lime hover:underline font-semibold tracking-wide"
+          {canEditCustomer && (
+            <Link
+              to={`/customers/${id}/edit`}
+              className="shrink-0 text-xs font-bold px-3.5 py-2 rounded-xl transition-all hover:brightness-110"
+              style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.75)' }}
             >
-              {addr.postcode.toUpperCase()}
-            </a>
-          ) : (
-            <p className="text-sm" style={{ color: 'rgba(0,0,0,0.25)' }}>—</p>
+              Edit
+            </Link>
           )}
         </div>
 
-        <div>
-          <FieldLabel>Rating</FieldLabel>
-          <p className="text-sm text-brand-dark">{customer.rating ? `${customer.rating} / 5` : '—'}</p>
-        </div>
+        {/* Zone 2 — Body */}
+        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x" style={{ background: 'white', borderColor: 'rgba(15,55,20,0.07)' }}>
 
-        <div>
-          <FieldLabel>Loyalty Balance</FieldLabel>
-          <p className="text-sm">
-            {customer.maintenance_hours_balance > 0
-              ? <span className="text-brand-lime font-semibold">{customer.maintenance_hours_balance.toFixed(1)} hrs</span>
-              : <span style={{ color: 'rgba(0,0,0,0.25)' }}>—</span>
-            }
-          </p>
-        </div>
+          {/* Left — Contact */}
+          <div className="p-5 flex flex-col gap-4">
 
-        <div>
-          <FieldLabel>Standing Discount</FieldLabel>
-          {editingDiscount ? (
-            <div className="flex items-center gap-2 mt-1">
-              <div className="relative">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.5"
-                  value={discountInput}
-                  onChange={e => setDiscountInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') saveDiscount(); if (e.key === 'Escape') setEditingDiscount(false) }}
-                  autoFocus
-                  className="w-20 field-input py-1.5 px-2 pr-6 text-center"
-                />
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs" style={{ color: 'rgba(15,55,20,0.4)' }}>%</span>
+            {/* Phone */}
+            {customer.phone ? (
+              <a href={`tel:${phoneHref(customer.phone)}`} className="flex items-center gap-3 group">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(151,181,69,0.12)' }}>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} style={{ color: '#97B545' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(15,55,20,0.4)' }}>Phone</p>
+                  <p className="text-sm font-semibold text-brand-lime">{formatPhone(customer.phone)}</p>
+                </div>
+              </a>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(0,0,0,0.04)' }}>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} style={{ color: 'rgba(0,0,0,0.2)' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(15,55,20,0.4)' }}>Phone</p>
+                  <p className="text-sm" style={{ color: 'rgba(0,0,0,0.25)' }}>—</p>
+                </div>
               </div>
-              <button
-                onClick={saveDiscount}
-                disabled={savingDiscount}
-                className="flex items-center gap-1 text-xs font-semibold text-brand-lime hover:text-brand-forest disabled:opacity-50"
-              >
-                {savingDiscount && <Spinner className="w-3 h-3 text-brand-lime" />}
-                Save
-              </button>
-              <button onClick={() => setEditingDiscount(false)} className="text-xs" style={{ color: 'rgba(15,55,20,0.4)' }}>
-                Cancel
-              </button>
+            )}
+
+            {/* Email */}
+            {customer.email ? (
+              <a href={`mailto:${customer.email}`} className="flex items-center gap-3 group">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(151,181,69,0.12)' }}>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} style={{ color: '#97B545' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(15,55,20,0.4)' }}>Email</p>
+                  <p className="text-sm font-semibold text-brand-lime truncate">{customer.email.toLowerCase()}</p>
+                </div>
+              </a>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(0,0,0,0.04)' }}>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} style={{ color: 'rgba(0,0,0,0.2)' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(15,55,20,0.4)' }}>Email</p>
+                  <p className="text-sm" style={{ color: 'rgba(0,0,0,0.25)' }}>—</p>
+                </div>
+              </div>
+            )}
+
+            {/* Address + Eircode */}
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ background: addressLines.length > 0 ? 'rgba(151,181,69,0.12)' : 'rgba(0,0,0,0.04)' }}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} style={{ color: addressLines.length > 0 ? '#97B545' : 'rgba(0,0,0,0.2)' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(15,55,20,0.4)' }}>Address</p>
+                {addressLines.length > 0 ? (
+                  <p className="text-sm text-brand-dark leading-relaxed mt-0.5">
+                    {addressLines.map((line, i) => (
+                      <span key={i}>{line}{i < addressLines.length - 1 && <br />}</span>
+                    ))}
+                  </p>
+                ) : (
+                  <p className="text-sm mt-0.5" style={{ color: 'rgba(0,0,0,0.25)' }}>—</p>
+                )}
+                {addr?.postcode && (
+                  <a
+                    href={`https://maps.google.com/?q=${encodeURIComponent(addr.postcode)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-bold mt-1.5 transition-colors hover:text-brand-lime"
+                    style={{ color: '#97B545' }}
+                  >
+                    {addr.postcode.toUpperCase()}
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <p className="text-sm">
-                {customer.discount_pct > 0
-                  ? <span className="font-semibold" style={{ color: '#DDB01D' }}>{customer.discount_pct}% off</span>
-                  : <span style={{ color: 'rgba(0,0,0,0.25)' }}>None</span>
-                }
-              </p>
-              <button
-                onClick={() => { setDiscountInput(String(customer.discount_pct ?? 0)); setEditingDiscount(true) }}
-                className="text-xs transition-colors"
-                style={{ color: 'rgba(15,55,20,0.35)' }}
-                title="Edit discount"
-              >
-                ✏
-              </button>
-            </div>
-          )}
+
+          </div>
+
+          {/* Right — Metrics */}
+          <div className="p-5 grid grid-cols-2 gap-3 content-start">
+
+            {customer.rating != null && (
+              <div className="rounded-2xl p-3.5" style={{ background: 'rgba(15,55,20,0.04)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(15,55,20,0.4)' }}>Rating</p>
+                <p className="text-xl font-black text-brand-dark mt-1">{customer.rating}<span className="text-sm font-semibold" style={{ color: 'rgba(15,55,20,0.35)' }}> / 5</span></p>
+              </div>
+            )}
+
+            {customer.minutes_from_hq != null && (
+              <div className="rounded-2xl p-3.5" style={{ background: 'rgba(15,55,20,0.04)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(15,55,20,0.4)' }}>Drive</p>
+                <p className="text-xl font-black text-brand-dark mt-1">{customer.minutes_from_hq}<span className="text-sm font-semibold" style={{ color: 'rgba(15,55,20,0.35)' }}> min</span></p>
+              </div>
+            )}
+
+            {customer.maintenance_hours_balance > 0 && (
+              <div className="rounded-2xl p-3.5" style={{ background: 'rgba(151,181,69,0.12)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(15,55,20,0.4)' }}>Loyalty</p>
+                <p className="text-xl font-black mt-1" style={{ color: '#97B545' }}>{customer.maintenance_hours_balance.toFixed(1)}<span className="text-sm font-semibold" style={{ color: 'rgba(151,181,69,0.6)' }}> hrs</span></p>
+              </div>
+            )}
+
+            {customer.discount_pct > 0 && (
+              <div className="rounded-2xl p-3.5" style={{ background: 'rgba(221,176,29,0.1)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(15,55,20,0.4)' }}>Discount</p>
+                <p className="text-xl font-black mt-1" style={{ color: '#DDB01D' }}>{customer.discount_pct}<span className="text-sm font-semibold" style={{ color: 'rgba(221,176,29,0.6)' }}>% off</span></p>
+              </div>
+            )}
+
+            {customer.default_callout_fee != null && customer.default_callout_fee > 0 && (
+              <div className="col-span-2 rounded-2xl p-3.5" style={{ background: 'rgba(15,55,20,0.04)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(15,55,20,0.4)' }}>Default Callout</p>
+                <p className="text-xl font-black text-brand-dark mt-1">€{Number(customer.default_callout_fee).toFixed(2)}<span className="text-sm font-semibold" style={{ color: 'rgba(15,55,20,0.35)' }}> ex-VAT</span></p>
+              </div>
+            )}
+
+          </div>
         </div>
 
-        <div>
-          <FieldLabel>Default Callout Fee</FieldLabel>
-          {editingCallout ? (
-            <div className="flex items-center gap-2 mt-1">
-              <div className="relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs" style={{ color: 'rgba(15,55,20,0.4)' }}>€</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={calloutInput}
-                  onChange={e => setCalloutInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') saveCallout(); if (e.key === 'Escape') setEditingCallout(false) }}
-                  placeholder="0.00"
-                  autoFocus
-                  className="w-24 field-input py-1.5 pl-6 pr-2 text-center"
-                />
-              </div>
-              <span className="text-xs" style={{ color: 'rgba(15,55,20,0.4)' }}>ex-VAT</span>
-              <button
-                onClick={saveCallout}
-                disabled={savingCallout}
-                className="flex items-center gap-1 text-xs font-semibold text-brand-lime hover:text-brand-forest disabled:opacity-50"
-              >
-                {savingCallout && <Spinner className="w-3 h-3 text-brand-lime" />}
-                Save
-              </button>
-              <button onClick={() => setEditingCallout(false)} className="text-xs" style={{ color: 'rgba(15,55,20,0.4)' }}>
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <p className="text-sm">
-                {customer.default_callout_fee && customer.default_callout_fee > 0
-                  ? <span className="text-brand-dark font-semibold">€{customer.default_callout_fee.toFixed(2)} ex-VAT</span>
-                  : <span style={{ color: 'rgba(0,0,0,0.25)' }}>None</span>
-                }
-              </p>
-              <button
-                onClick={() => { setCalloutInput(customer.default_callout_fee ? String(customer.default_callout_fee) : ''); setEditingCallout(true) }}
-                className="text-xs transition-colors"
-                style={{ color: 'rgba(15,55,20,0.35)' }}
-                title="Edit callout fee"
-              >
-                ✏
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Zone 3 — Notes strip */}
+        {customer.notes && (
+          <div className="px-5 py-4 flex items-start gap-3 border-t" style={{ background: 'rgba(221,176,29,0.06)', borderColor: 'rgba(221,176,29,0.2)' }}>
+            <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: '#DDB01D' }}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <p className="text-sm text-brand-dark whitespace-pre-wrap leading-relaxed">{customer.notes}</p>
+          </div>
+        )}
 
       </div>
-
-      {customer.notes && (
-        <div className="card p-5 md:p-6 mb-4">
-          <p className="section-label">Notes</p>
-          <p className="text-sm text-brand-dark whitespace-pre-wrap">{customer.notes}</p>
-        </div>
-      )}
 
       {/* Job History */}
       <div className="card p-5 md:p-6 mb-4">
@@ -432,7 +381,7 @@ export default function CustomerDetail() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-brand-dark truncate">{job.title}</p>
+                      <p className="text-sm font-semibold text-brand-dark truncate">{toTitleCase(job.title)}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`badge ${typeStyle(job.type)}`}>
                           {typeLabel(job.type)}
@@ -464,21 +413,23 @@ export default function CustomerDetail() {
       </div>
 
       {/* Archive / Delete */}
-      <div className="flex items-center gap-6 pt-2 pb-4">
-        <button
-          onClick={handleArchive}
-          className="text-sm transition-colors cursor-pointer"
-          style={{ color: 'rgba(15,55,20,0.4)' }}
-        >
-          Archive customer
-        </button>
-        <button
-          onClick={handleDelete}
-          className="text-sm text-danger transition-colors cursor-pointer"
-        >
-          Delete customer
-        </button>
-      </div>
+      {canEditCustomer && (
+        <div className="flex items-center gap-6 pt-2 pb-4">
+          <button
+            onClick={handleArchive}
+            className="text-sm transition-colors cursor-pointer"
+            style={{ color: 'rgba(15,55,20,0.4)' }}
+          >
+            Archive customer
+          </button>
+          <button
+            onClick={handleDelete}
+            className="text-sm text-danger transition-colors cursor-pointer"
+          >
+            Delete customer
+          </button>
+        </div>
+      )}
 
     </div>
   )

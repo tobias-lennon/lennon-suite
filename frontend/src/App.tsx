@@ -19,6 +19,10 @@ import InvoiceList from './pages/invoices/InvoiceList'
 import InvoiceDetail from './pages/invoices/InvoiceDetail'
 import Profile from './pages/Profile'
 import Settings from './pages/Settings'
+import Schedule from './pages/Schedule'
+import Office from './pages/Office'
+import ContactList from './pages/contacts/ContactList'
+import ContactForm from './pages/contacts/ContactForm'
 
 export default function App() {
   return (
@@ -50,6 +54,11 @@ export default function App() {
             <Route path="/leads/:id/edit" element={<LeadForm />} />
             <Route path="/invoices" element={<InvoiceList />} />
             <Route path="/invoices/:id" element={<InvoiceDetail />} />
+            <Route path="/schedule" element={<Schedule />} />
+            <Route path="/office" element={<Office />} />
+            <Route path="/contacts" element={<ContactList />} />
+            <Route path="/contacts/new" element={<ContactForm />} />
+            <Route path="/contacts/:id/edit" element={<ContactForm />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
           </Route>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../../lib/api'
 import { toTitleCase } from '../../lib/formatters'
+import { usePermissions } from '../../hooks/usePermissions'
 import Spinner from '../../components/Spinner'
 import ConfirmDialog from '../../components/ConfirmDialog'
 
@@ -38,6 +39,7 @@ interface WorkLog {
   id: number
   date: string
   notes: string | null
+  follow_up_note: string | null
   callout_fee: number | null
   entries: WorkLogEntry[]
   materials: Material[]
@@ -108,6 +110,7 @@ function fmtTime(t: string | null) {
 export default function JobDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { canEditJob, canDeleteJob, canCreateInvoice, canLogWork } = usePermissions()
   const [job, setJob] = useState<Job | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [expandedLogs, setExpandedLogs] = useState<Set<number>>(new Set())
@@ -310,7 +313,7 @@ export default function JobDetail() {
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
-          {job.status !== 'complete' && (
+          {job.status !== 'complete' && canEditJob && (
             <Link
               to={`/jobs/${id}/edit`}
               className="min-w-[52px] text-center px-3 py-1.5 rounded-lg text-sm border border-black/10 hover:bg-black/5 transition-colors"
@@ -318,7 +321,7 @@ export default function JobDetail() {
               Edit
             </Link>
           )}
-          {job.status !== 'complete' && (
+          {job.status !== 'complete' && canLogWork && (
             <Link
               to={`/jobs/${id}/logs/new`}
               className="min-w-[90px] text-center px-3 py-1.5 rounded-lg text-sm text-white font-medium"
@@ -397,15 +400,20 @@ export default function JobDetail() {
           <h2 className="section-label">Job Totals</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
             <TotalRow label="Total hours" value={`${job.totals.total_hours}h`} />
-            <TotalRow label="Labour charged" value={fmt(job.totals.total_labour_charged)} />
-            <TotalRow label="Labour cost" value={fmt(job.totals.total_labour_cost)} />
-            <TotalRow label="Materials" value={fmt(job.totals.total_materials)} />
-            {job.totals.callout_fee > 0 && (
-              <TotalRow label="Callout fee" value={fmt(job.totals.callout_fee)} />
-            )}
-            <TotalRow label="Total charged" value={fmt(job.totals.total_charged)} highlight />
-            <TotalRow label="Labour margin" value={fmt(job.totals.margin)} highlight={job.totals.margin >= 0} />
+            {job.type !== 'internal' && <>
+              <TotalRow label="Labour charged" value={fmt(job.totals.total_labour_charged)} />
+              <TotalRow label="Labour cost" value={fmt(job.totals.total_labour_cost)} />
+              <TotalRow label="Materials" value={fmt(job.totals.total_materials)} />
+              {job.totals.callout_fee > 0 && (
+                <TotalRow label="Callout fee" value={fmt(job.totals.callout_fee)} />
+              )}
+              <TotalRow label="Total charged" value={fmt(job.totals.total_charged)} highlight />
+              <TotalRow label="Labour margin" value={fmt(job.totals.margin)} highlight={job.totals.margin >= 0} />
+            </>}
           </div>
+          {job.type === 'internal' && (
+            <p className="text-xs text-gray-400 mt-2 italic">Internal work — hours logged only, no billing.</p>
+          )}
           {job.customer?.discount_pct > 0 && (
             <p className="text-xs text-gray-400 mt-2">
               {job.customer.discount_pct}% discount applied to this customer's rates.
@@ -450,23 +458,25 @@ export default function JobDetail() {
                 <p className="text-sm font-medium" style={{ color: '#0F3714' }}>Not yet invoiced</p>
                 <p className="text-xs mt-0.5" style={{ color: 'rgba(15,55,20,0.6)' }}>This job is complete but hasn't been invoiced.</p>
               </div>
-              <button
-                onClick={createInvoice}
-                disabled={creatingInvoice || job.work_logs.length === 0}
-                title={job.work_logs.length === 0 ? 'Add at least one work log before invoicing' : ''}
-                className="min-w-[130px] flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-white rounded-lg disabled:opacity-50 shrink-0"
-                style={{ backgroundColor: '#0F3714' }}
-              >
-                {creatingInvoice ? (
-                  <>
-                    <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                    </svg>
-                    Creating
-                  </>
-                ) : 'Create Invoice'}
-              </button>
+              {canCreateInvoice && (
+                <button
+                  onClick={createInvoice}
+                  disabled={creatingInvoice || job.work_logs.length === 0}
+                  title={job.work_logs.length === 0 ? 'Add at least one work log before invoicing' : ''}
+                  className="min-w-[130px] flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-white rounded-lg disabled:opacity-50 shrink-0"
+                  style={{ backgroundColor: '#0F3714' }}
+                >
+                  {creatingInvoice ? (
+                    <>
+                      <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      Creating
+                    </>
+                  ) : 'Create Invoice'}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -535,6 +545,12 @@ export default function JobDetail() {
                     )}
                     {log.notes && (
                       <p className="text-xs text-gray-500 italic my-2">{log.notes}</p>
+                    )}
+                    {log.follow_up_note && (
+                      <div className="flex items-start gap-1.5 my-2 px-2 py-1.5 rounded-lg" style={{ background: 'rgba(221,176,29,0.1)', border: '1px solid rgba(221,176,29,0.25)' }}>
+                        <span className="text-xs shrink-0">📌</span>
+                        <p className="text-xs" style={{ color: '#9a7c0a' }}>{log.follow_up_note}</p>
+                      </div>
                     )}
 
                     {/* Entries */}
@@ -607,7 +623,7 @@ export default function JobDetail() {
 
                     {/* Log actions */}
                     <div className="mt-3 pt-3 border-t border-black/5 flex items-center gap-4">
-                      {job.status !== 'complete' && (
+                      {job.status !== 'complete' && canLogWork && (
                         <Link
                           to={`/jobs/${id}/logs/${log.id}/edit`}
                           className="text-xs font-medium"
@@ -620,7 +636,7 @@ export default function JobDetail() {
                         <span className="text-xs text-gray-400">
                           {job.invoice ? 'Delete the invoice first to remove logs' : 'Revert status to remove logs'}
                         </span>
-                      ) : (
+                      ) : canLogWork ? (
                         <button
                           onClick={() => setConfirm({
                             title: 'Delete work log?',
@@ -632,7 +648,7 @@ export default function JobDetail() {
                         >
                           Delete log
                         </button>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -644,7 +660,7 @@ export default function JobDetail() {
 
       {/* Bottom actions */}
       <div className="border-t border-black/5 pt-6 flex items-center gap-4 flex-wrap">
-        {job.status !== 'complete' && (
+        {job.status !== 'complete' && canEditJob && (
           <button
             onClick={completeJob}
             disabled={statusUpdating}
@@ -655,17 +671,19 @@ export default function JobDetail() {
             Mark Complete
           </button>
         )}
-        <button
-          onClick={() => setConfirm({
-            title: 'Delete this job?',
-            message: 'All work logs and entries will be permanently deleted.',
-            confirmLabel: 'Delete job',
-            onConfirm: async () => { setConfirm(null); await deleteJob() },
-          })}
-          className="text-sm text-danger"
-        >
-          Delete job
-        </button>
+        {canDeleteJob && (
+          <button
+            onClick={() => setConfirm({
+              title: 'Delete this job?',
+              message: 'All work logs and entries will be permanently deleted.',
+              confirmLabel: 'Delete job',
+              onConfirm: async () => { setConfirm(null); await deleteJob() },
+            })}
+            className="text-sm text-danger"
+          >
+            Delete job
+          </button>
+        )}
       </div>
     </div>
   )

@@ -290,7 +290,7 @@ export default function JobList() {
                   <span>{TYPE_LABELS[job.type]}</span>
                   {job.priority !== 'normal' && (
                     <span className={`badge ${PRIORITY_COLOURS[job.priority]}`}>
-                      {job.priority}
+                      {job.priority.charAt(0).toUpperCase() + job.priority.slice(1)}
                     </span>
                   )}
                   {job.scheduled_date && job.status !== 'backlog' && (

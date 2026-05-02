@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../../lib/api'
+import { toTitleCase, normalizePhone } from '../../lib/formatters'
 import Spinner from '../../components/Spinner'
 
 interface FormData {
@@ -11,6 +12,9 @@ interface FormData {
   email: string
   notes: string
   rating: string
+  minutes_from_hq: string
+  discount_pct: string
+  default_callout_fee: string
   address: {
     address_line_1: string
     address_line_2: string
@@ -38,7 +42,8 @@ const IRISH_COUNTIES = [
 ]
 
 const empty: FormData = {
-  name: '', type: 'residential', phone: '', email: '', notes: '', rating: '',
+  name: '', type: 'residential', phone: '', email: '', notes: '', rating: '', minutes_from_hq: '',
+  discount_pct: '', default_callout_fee: '',
   address: { address_line_1: '', address_line_2: '', city: '', county: '', postcode: '' },
 }
 
@@ -65,7 +70,7 @@ function validate(form: FormData): FormErrors {
   if (form.address.postcode.trim()) {
     const clean = form.address.postcode.replace(/\s/g, '').toUpperCase()
     if (!/^[A-Z0-9]{7}$/.test(clean)) {
-      errors.postcode = 'Enter a valid Eircode (e.g. A65 F4E2)'
+      errors.postcode = 'Enter a valid Eircode (e.g. P51R2P2)'
     }
   }
 
@@ -127,10 +132,13 @@ export default function CustomerForm() {
       setForm({
         name: c.name ?? '',
         type: c.type ?? 'residential',
-        phone: c.phone ?? '',
+        phone: normalizePhone(c.phone ?? '') ?? '',
         email: c.email ?? '',
         notes: c.notes ?? '',
         rating: c.rating ? String(c.rating) : '',
+        minutes_from_hq: c.minutes_from_hq ? String(c.minutes_from_hq) : '',
+        discount_pct: c.discount_pct ? String(c.discount_pct) : '',
+        default_callout_fee: c.default_callout_fee ? String(c.default_callout_fee) : '',
         address: {
           address_line_1: c.address?.address_line_1 ?? '',
           address_line_2: c.address?.address_line_2 ?? '',
@@ -180,16 +188,19 @@ export default function CustomerForm() {
     setSubmitError(null)
 
     const payload = {
-      name: form.name.trim(),
+      name: toTitleCase(form.name.trim()) ?? form.name.trim(),
       type: form.type || null,
-      phone: form.phone.trim() || null,
-      email: form.email.trim() || null,
+      phone: normalizePhone(form.phone) ?? null,
+      email: form.email.trim().toLowerCase() || null,
       notes: form.notes.trim() || null,
       rating: form.rating ? parseInt(form.rating) : null,
+      minutes_from_hq: form.minutes_from_hq ? parseInt(form.minutes_from_hq) : null,
+      discount_pct: form.discount_pct ? parseFloat(form.discount_pct) : 0,
+      default_callout_fee: form.default_callout_fee ? parseFloat(form.default_callout_fee) : null,
       address: {
-        address_line_1: form.address.address_line_1.trim() || null,
-        address_line_2: form.address.address_line_2.trim() || null,
-        city: form.address.city.trim() || null,
+        address_line_1: toTitleCase(form.address.address_line_1.trim()) ?? null,
+        address_line_2: toTitleCase(form.address.address_line_2.trim()) ?? null,
+        city: toTitleCase(form.address.city.trim()) ?? null,
         county: form.address.county.trim() || null,
         postcode: form.address.postcode.trim() || null,
       },
@@ -257,11 +268,16 @@ export default function CustomerForm() {
             <Field label="Phone" error={touched.has('phone') ? errors.phone : undefined}>
               <input
                 ref={phoneRef}
+                type="tel"
                 value={form.phone}
                 onChange={e => set('phone', e.target.value)}
-                onBlur={() => touch('phone')}
+                onBlur={() => {
+                  touch('phone')
+                  const normalized = normalizePhone(form.phone)
+                  set('phone', normalized ?? '')
+                }}
                 className={inputCls(!!errors.phone && touched.has('phone'))}
-                placeholder="+353…"
+                placeholder="+353 89 123 4567"
               />
             </Field>
             <Field label="Email" error={touched.has('email') ? errors.email : undefined}>
@@ -277,12 +293,25 @@ export default function CustomerForm() {
             </Field>
           </div>
 
-          <Field label="Rating (1–5)">
-            <select value={form.rating} onChange={e => set('rating', e.target.value)} className={inputCls(false)}>
-              <option value="">—</option>
-              {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Rating (1–5)">
+              <select value={form.rating} onChange={e => set('rating', e.target.value)} className={inputCls(false)}>
+                <option value="">—</option>
+                {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </Field>
+            <Field label="Drive from HQ (mins)">
+              <input
+                type="number"
+                min="1"
+                max="600"
+                value={form.minutes_from_hq}
+                onChange={e => set('minutes_from_hq', e.target.value)}
+                className={inputCls(false)}
+                placeholder="e.g. 25"
+              />
+            </Field>
+          </div>
         </div>
 
         {/* Address */}
@@ -297,14 +326,10 @@ export default function CustomerForm() {
               onBlur={() => {
                 touch('postcode')
                 const raw = form.address.postcode.replace(/\s/g, '').toUpperCase()
-                if (raw.length === 7) {
-                  setAddr('postcode', `${raw.slice(0, 3)} ${raw.slice(3)}`)
-                } else if (raw.length > 0) {
-                  setAddr('postcode', raw)
-                }
+                if (raw.length > 0) setAddr('postcode', raw)
               }}
               className={inputCls(!!errors.postcode && touched.has('postcode'))}
-              placeholder="e.g. A65 F4E2"
+              placeholder="e.g. P51R2P2"
             />
           </Field>
 
@@ -343,6 +368,42 @@ export default function CustomerForm() {
                   </option>
                 ))}
               </select>
+            </Field>
+          </div>
+        </div>
+
+        {/* Rates */}
+        <div className="card p-6 flex flex-col gap-4">
+          <h2 className="section-label">Rates</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Standing Discount (%)">
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  value={form.discount_pct}
+                  onChange={e => set('discount_pct', e.target.value)}
+                  className={inputCls(false)}
+                  placeholder="0"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: 'rgba(15,55,20,0.4)' }}>%</span>
+              </div>
+            </Field>
+            <Field label="Default Callout Fee (ex-VAT)">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: 'rgba(15,55,20,0.4)' }}>€</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.default_callout_fee}
+                  onChange={e => set('default_callout_fee', e.target.value)}
+                  className={`${inputCls(false)} pl-7`}
+                  placeholder="0.00"
+                />
+              </div>
             </Field>
           </div>
         </div>

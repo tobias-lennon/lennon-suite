@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Avatar from './Avatar'
 import Logo from './Logo'
@@ -20,24 +20,29 @@ const allNavItems = [
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
     </svg>
   )},
-  { to: '/invoices', label: 'Invoices', roles: ['admin'], icon: (
+  { to: '/schedule', label: 'Schedule', roles: ['admin', 'field'], icon: (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
     </svg>
   )},
-  { to: '/leads', label: 'Leads', roles: ['admin'], icon: (
+  { to: '/office', label: 'Office', roles: ['admin'], icon: (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zm0 0V5a2 2 0 00-2-2H6a2 2 0 00-2 2v2" />
     </svg>
   )},
 ]
 
+const OFFICE_CHILD_PATHS = ['/invoices', '/leads', '/contacts']
+
 export default function AppLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const role = user?.role ?? 'field'
   const navItems = allNavItems.filter(item => item.roles.includes(role))
+
+  const isOfficeActive = OFFICE_CHILD_PATHS.some(p => location.pathname.startsWith(p))
 
   async function handleLogout() {
     setMenuOpen(false)
@@ -62,13 +67,14 @@ export default function AppLayout() {
             <NavLink
               key={item.to}
               to={item.to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  isActive
+              className={({ isActive }) => {
+                const active = isActive || (item.to === '/office' && isOfficeActive)
+                return `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  active
                     ? 'bg-brand-lime text-brand-dark'
                     : 'text-white/55 hover:text-white hover:bg-white/8'
                 }`
-              }
+              }}
             >
               {item.icon}
               {item.label}
@@ -196,7 +202,9 @@ export default function AppLayout() {
 
       {/* ── Main content ────────────────────────────────────────────── */}
       <main className="flex-1 overflow-y-auto overscroll-contain pt-14 pb-28 md:pt-0 md:pb-0">
-        <Outlet />
+        <div key={location.pathname} className="page-enter">
+          <Outlet />
+        </div>
       </main>
 
       {/* ── Mobile floating bottom nav ──────────────────────────────── */}
@@ -213,13 +221,14 @@ export default function AppLayout() {
               key={item.to}
               to={item.to}
               style={{ touchAction: 'manipulation' }}
-              className={({ isActive }) =>
-                `flex-1 flex flex-col items-center gap-0.5 py-2 px-1 rounded-[22px] text-[10px] font-semibold transition-all duration-200 ${
-                  isActive
+              className={({ isActive }) => {
+                const active = isActive || (item.to === '/office' && isOfficeActive)
+                return `flex-1 flex flex-col items-center gap-0.5 py-2 px-1 rounded-[22px] text-[10px] font-semibold transition-all duration-200 ${
+                  active
                     ? 'bg-brand-lime text-brand-dark'
                     : 'text-white/50'
                 }`
-              }
+              }}
             >
               {item.icon}
               {item.label}

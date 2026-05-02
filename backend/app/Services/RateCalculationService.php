@@ -80,6 +80,11 @@ class RateCalculationService
 
     public function checkMaintenanceLoyalty(Customer $customer, float $hoursAdded): void
     {
+        $card = $this->resolveRateCard($customer);
+        if ($card->skip_loyalty) {
+            return;
+        }
+
         $customer->maintenance_hours_balance += $hoursAdded;
         $threshold = (int) CompanySetting::get('loyalty_threshold_hours', 60);
 

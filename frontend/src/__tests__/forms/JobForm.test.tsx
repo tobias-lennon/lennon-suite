@@ -169,7 +169,7 @@ describe('JobForm — Add mode', () => {
     await user.click(screen.getByRole('button', { name: /create job/i }))
 
     await waitFor(() => {
-      expect(captured).toMatchObject({ title: 'Front garden', customer_id: 1 })
+      expect(captured).toMatchObject({ title: 'Front Garden', customer_id: 1 })
     })
   })
 

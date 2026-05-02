@@ -19,9 +19,12 @@ class Lead extends Model
         'converted_customer_id',
     ];
 
-    protected $casts = [
-        'requires_site_visit' => 'boolean',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'requires_site_visit' => 'boolean',
+        ];
+    }
 
     public function convertedCustomer(): BelongsTo
     {

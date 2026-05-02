@@ -5,11 +5,27 @@ export function toTitleCase(str: string | null): string | null {
     .replace(/'([a-z])/g, (_, c) => `'${c.toUpperCase()}`)
 }
 
+export function normalizePhone(phone: string): string | null {
+  if (!phone.trim()) return null
+  const digits = phone.replace(/\D/g, '')
+  if (digits.startsWith('353') && digits.length >= 11) return '+' + digits
+  if (digits.startsWith('0') && digits.length >= 9) return '+353' + digits.slice(1)
+  if (phone.trim()) return phone.trim()
+  return null
+}
+
 export function formatPhone(phone: string | null): string | null {
   if (!phone) return null
   const digits = phone.replace(/\D/g, '')
   if (digits.startsWith('353') && digits.length >= 11) {
     return `+353 ${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8)}`
+  }
+  if (digits.startsWith('0') && digits.length >= 9) {
+    const nat = digits.slice(1)
+    return `+353 ${nat.slice(0, 2)} ${nat.slice(2, 5)} ${nat.slice(5)}`
+  }
+  if (digits.startsWith('1') && digits.length === 11) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`
   }
   return phone
 }
@@ -17,5 +33,7 @@ export function formatPhone(phone: string | null): string | null {
 export function phoneHref(phone: string | null): string | null {
   if (!phone) return null
   const digits = phone.replace(/\D/g, '')
-  return digits.startsWith('353') ? `+${digits}` : phone
+  if (digits.startsWith('353')) return `+${digits}`
+  if (digits.startsWith('0')) return `+353${digits.slice(1)}`
+  return phone
 }

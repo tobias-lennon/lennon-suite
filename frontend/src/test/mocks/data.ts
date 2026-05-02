@@ -14,7 +14,7 @@ export const mockEmployees = [
 ]
 
 export const mockCustomers = [
-  { id: 1, name: 'John Murphy', type: 'residential', phone: '087 123 4567', email: 'john@example.com', discount_pct: 0 },
+  { id: 1, name: 'John Murphy', type: 'residential', phone: '+353871234567', email: 'john@example.com', discount_pct: 0 },
   { id: 2, name: 'Mary O\'Brien', type: 'residential', phone: null, email: null, discount_pct: 0 },
 ]
 
@@ -132,7 +132,7 @@ export const mockInvoice = {
     id: 1,
     name: 'John Murphy',
     email: 'john@example.com',
-    phone: '087 123 4567',
+    phone: '+353871234567',
     address: {
       address_line_1: '12 Main Street',
       address_line_2: null,

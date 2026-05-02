@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react'
-import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../lib/api'
 import Avatar from '../components/Avatar'
@@ -7,7 +6,6 @@ import Spinner from '../components/Spinner'
 
 export default function Profile() {
   const { user, updateUser } = useAuth()
-  useRegisterSW()
 
   // ── Password form ────────────────────────────────────────────────
   const [currentPassword, setCurrentPassword]   = useState('')
@@ -52,18 +50,33 @@ export default function Profile() {
   async function handleCheckUpdate() {
     setUpdateStatus('checking')
     try {
+      const reg = await navigator.serviceWorker?.getRegistration()
+
+      // Force the browser to re-fetch the SW script and install any new version
+      if (reg) await reg.update()
+
+      // If a new SW downloaded and is waiting, activate it then reload
+      if (reg?.waiting) {
+        setUpdateStatus('available')
+        navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true })
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+        return
+      }
+
+      // No waiting SW — check version.json as fallback
       const res = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' })
       const { version: serverVersion } = await res.json()
 
       if (serverVersion !== __APP_VERSION__) {
+        // Version differs but SW hasn't updated yet — nuke caches and reload fresh
         setUpdateStatus('available')
-        // Tell SW to skip waiting if one is pending, then reload
-        const reg = await navigator.serviceWorker?.getRegistration()
-        reg?.waiting?.postMessage({ type: 'SKIP_WAITING' })
+        const cacheKeys = await caches.keys()
+        await Promise.all(cacheKeys.map(k => caches.delete(k)))
+        await reg?.unregister()
         window.location.reload()
         return
       }
-    } catch { /* offline or no version.json */ }
+    } catch { /* offline or no service worker support */ }
 
     setUpdateStatus('up-to-date')
     setTimeout(() => setUpdateStatus('idle'), 3000)

@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Services\GeocodingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
 {
+    public function __construct(private GeocodingService $geocoding) {}
+
     private const COUNTIES = [
         'CARLOW', 'CAVAN', 'CLARE', 'CORK', 'DONEGAL',
         'DUBLIN', 'GALWAY', 'KERRY', 'KILDARE', 'KILKENNY',
@@ -33,7 +36,7 @@ class CustomerController extends Controller
     {
         if ($value === null) return null;
         $value = strip_tags($value);
-        $value = preg_replace('/^co\.?\s*/i', '', $value);
+        $value = preg_replace('/^co[.\s]\s*/i', '', $value);
         $value = strtoupper(trim($value));
         return $value === '' ? null : $value;
     }
@@ -56,12 +59,15 @@ class CustomerController extends Controller
 
         return [
             'customer' => [
-                'name'   => $this->clean($data['name'] ?? null),
-                'type'   => $data['type'] ?? null,
-                'phone'  => $this->clean($data['phone'] ?? null),
-                'email'  => isset($data['email']) ? strtolower(trim($data['email'])) : null,
-                'notes'  => $this->clean($data['notes'] ?? null),
-                'rating' => $data['rating'] ?? null,
+                'name'                => $this->clean($data['name'] ?? null),
+                'type'                => $data['type'] ?? null,
+                'phone'               => $this->clean($data['phone'] ?? null),
+                'email'               => isset($data['email']) ? strtolower(trim($data['email'])) : null,
+                'notes'               => $this->clean($data['notes'] ?? null),
+                'rating'              => $data['rating'] ?? null,
+                'minutes_from_hq'     => isset($data['minutes_from_hq']) ? (int) $data['minutes_from_hq'] : null,
+                'discount_pct'        => $data['discount_pct'] ?? null,
+                'default_callout_fee' => $data['default_callout_fee'] ?? null,
             ],
             'address' => [
                 'address_line_1' => $this->clean($addr['address_line_1'] ?? null),
@@ -139,6 +145,9 @@ class CustomerController extends Controller
             'email'                   => 'nullable|email:rfc,dns|max:255',
             'notes'                   => 'nullable|string|max:5000',
             'rating'                  => 'nullable|integer|min:1|max:5',
+            'minutes_from_hq'         => 'nullable|integer|min:1|max:600',
+            'discount_pct'            => 'nullable|numeric|min:0|max:100',
+            'default_callout_fee'     => 'nullable|numeric|min:0',
             'address.address_line_1'  => 'nullable|string|max:255',
             'address.address_line_2'  => 'nullable|string|max:255',
             'address.city'            => 'nullable|string|max:100',
@@ -158,6 +167,13 @@ class CustomerController extends Controller
             $customer->address()->create($clean['address']);
         }
 
+        if ($clean['address']['postcode'] ?? null) {
+            $coords = $this->geocoding->geocodeEircode($clean['address']['postcode']);
+            if ($coords) {
+                $customer->update(['latitude' => $coords['latitude'], 'longitude' => $coords['longitude']]);
+            }
+        }
+
         return response()->json($customer->load('address'), 201);
     }
 
@@ -170,6 +186,9 @@ class CustomerController extends Controller
             'email'                   => 'nullable|email:rfc,dns|max:255',
             'notes'                   => 'nullable|string|max:5000',
             'rating'                  => 'nullable|integer|min:1|max:5',
+            'minutes_from_hq'         => 'nullable|integer|min:1|max:600',
+            'discount_pct'            => 'nullable|numeric|min:0|max:100',
+            'default_callout_fee'     => 'nullable|numeric|min:0',
             'address.address_line_1'  => 'nullable|string|max:255',
             'address.address_line_2'  => 'nullable|string|max:255',
             'address.city'            => 'nullable|string|max:100',
@@ -180,12 +199,15 @@ class CustomerController extends Controller
         $clean = $this->sanitise($data);
 
         $customer->update([
-            'name'   => $clean['customer']['name']   ?? $customer->name,
-            'type'   => array_key_exists('type',   $clean['customer']) ? ($clean['customer']['type']   ?? $customer->type)   : $customer->type,
-            'phone'  => array_key_exists('phone',  $clean['customer']) ? ($clean['customer']['phone']  ?? null)              : $customer->phone,
-            'email'  => array_key_exists('email',  $clean['customer']) ? ($clean['customer']['email']  ?? null)              : $customer->email,
-            'notes'  => array_key_exists('notes',  $clean['customer']) ? ($clean['customer']['notes']  ?? null)              : $customer->notes,
-            'rating' => array_key_exists('rating', $clean['customer']) ? ($clean['customer']['rating'] ?? null)              : $customer->rating,
+            'name'                => $clean['customer']['name']   ?? $customer->name,
+            'type'                => array_key_exists('type',                $clean['customer']) ? ($clean['customer']['type']                ?? $customer->type)                : $customer->type,
+            'phone'               => array_key_exists('phone',               $clean['customer']) ? ($clean['customer']['phone']               ?? null)                          : $customer->phone,
+            'email'               => array_key_exists('email',               $clean['customer']) ? ($clean['customer']['email']               ?? null)                          : $customer->email,
+            'notes'               => array_key_exists('notes',               $clean['customer']) ? ($clean['customer']['notes']               ?? null)                          : $customer->notes,
+            'rating'              => array_key_exists('rating',              $clean['customer']) ? ($clean['customer']['rating']              ?? null)                          : $customer->rating,
+            'minutes_from_hq'     => array_key_exists('minutes_from_hq',     $clean['customer']) ? ($clean['customer']['minutes_from_hq']     ?? null)                          : $customer->minutes_from_hq,
+            'discount_pct'        => array_key_exists('discount_pct',        $clean['customer']) ? ($clean['customer']['discount_pct']        ?? 0)                             : $customer->discount_pct,
+            'default_callout_fee' => array_key_exists('default_callout_fee', $clean['customer']) ? ($clean['customer']['default_callout_fee'] ?? null)                          : $customer->default_callout_fee,
         ]);
 
         if (isset($data['address'])) {
@@ -193,6 +215,13 @@ class CustomerController extends Controller
                 ['customer_id' => $customer->id],
                 $clean['address']
             );
+
+            if ($clean['address']['postcode'] ?? null) {
+                $coords = $this->geocoding->geocodeEircode($clean['address']['postcode']);
+                if ($coords) {
+                    $customer->update(['latitude' => $coords['latitude'], 'longitude' => $coords['longitude']]);
+                }
+            }
         }
 
         return response()->json($customer->load('address'));

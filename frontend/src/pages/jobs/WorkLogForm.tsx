@@ -156,6 +156,8 @@ export default function WorkLogForm() {
 
   const [date, setDate] = useState(new Date().toISOString().substring(0, 10))
   const [notes, setNotes] = useState('')
+  const [followUpNote, setFollowUpNote] = useState('')
+  const [prevFollowUpNote, setPrevFollowUpNote] = useState<string | null>(null)
   const [hasWasteDisposal, setHasWasteDisposal] = useState(false)
   const [entries, setEntries] = useState<EntryRow[]>(() => {
     const t = getCurrentTimeRounded()
@@ -168,6 +170,7 @@ export default function WorkLogForm() {
   const [serverError, setServerError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [jobComplete, setJobComplete] = useState(false)
+  const [jobType, setJobType] = useState<string>('')
 
   useEffect(() => {
     const requests = [api.get(`/jobs/${id}`), api.get('/employees')]
@@ -178,12 +181,24 @@ export default function WorkLogForm() {
       if (jobData.status === 'complete' && !isEdit) {
         setJobComplete(true)
       }
+      setJobType(jobData.type ?? '')
       setEmployees(empRes.data)
+
+      // For new logs, surface the previous log's follow-up note as a banner
+      if (!isEdit && jobData.work_logs?.length > 0) {
+        const sorted = [...jobData.work_logs].sort(
+          (a: { date: string }, b: { date: string }) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        )
+        if (sorted[0]?.follow_up_note) {
+          setPrevFollowUpNote(sorted[0].follow_up_note)
+        }
+      }
 
       if (isEdit && logRes) {
         const log = logRes.data
         setDate((log.date ?? '').substring(0, 10))
         setNotes(log.notes ?? '')
+        setFollowUpNote(log.follow_up_note ?? '')
         setHasWasteDisposal(!!log.has_waste_disposal)
         setMaterials(
           (log.materials ?? []).map((m: {
@@ -320,6 +335,7 @@ export default function WorkLogForm() {
         await api.patch(`/jobs/${id}/logs/${logId}`, {
           date,
           notes: notes || null,
+          follow_up_note: followUpNote || null,
           has_waste_disposal: hasWasteDisposal,
         })
         // Update each time entry
@@ -362,6 +378,7 @@ export default function WorkLogForm() {
         const payload = {
           date,
           notes: notes || null,
+          follow_up_note: followUpNote || null,
           has_waste_disposal: hasWasteDisposal,
           entries: entries.map(e => ({
             employee_id: Number(e.employee_id),
@@ -419,6 +436,16 @@ export default function WorkLogForm() {
         </p>
       )}
 
+      {prevFollowUpNote && (
+        <div className="mb-5 flex gap-3 p-4 rounded-xl" style={{ background: 'rgba(221,176,29,0.12)', border: '1px solid rgba(221,176,29,0.35)' }}>
+          <span className="text-lg shrink-0">📌</span>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide mb-1" style={{ color: '#9a7c0a' }}>Note from last visit</p>
+            <p className="text-sm" style={{ color: '#0F3714' }}>{prevFollowUpNote}</p>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
 
         {/* Date */}
@@ -434,9 +461,11 @@ export default function WorkLogForm() {
         </div>
 
         {/* Day-level flags */}
-        <div className="flex gap-2 flex-wrap">
-          <ToggleChip label="Waste disposal" checked={hasWasteDisposal} onChange={setHasWasteDisposal} />
-        </div>
+        {jobType !== 'internal' && (
+          <div className="flex gap-2 flex-wrap">
+            <ToggleChip label="Waste disposal" checked={hasWasteDisposal} onChange={setHasWasteDisposal} />
+          </div>
+        )}
 
         {/* Time entries */}
         <div>
@@ -541,13 +570,15 @@ export default function WorkLogForm() {
                   </div>
                 </div>
 
-                <div className="mt-3 flex gap-2 flex-wrap">
-                  <ToggleChip
-                    label="Power tools"
-                    checked={entry.hasPowerTools}
-                    onChange={v => updateEntry(i, 'hasPowerTools', v)}
-                  />
-                </div>
+                {jobType !== 'internal' && (
+                  <div className="mt-3 flex gap-2 flex-wrap">
+                    <ToggleChip
+                      label="Power tools"
+                      checked={entry.hasPowerTools}
+                      onChange={v => updateEntry(i, 'hasPowerTools', v)}
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -679,6 +710,19 @@ export default function WorkLogForm() {
             placeholder="Any notes about this visit…"
             className="field-input"
           />
+        </div>
+
+        {/* Follow-up note */}
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'rgba(15,55,20,0.45)' }}>Follow-up note for next visit</label>
+          <textarea
+            value={followUpNote}
+            onChange={e => setFollowUpNote(e.target.value)}
+            rows={2}
+            placeholder="e.g. Bring weed suppressor, check back fence…"
+            className="field-input"
+          />
+          <p className="text-xs mt-1" style={{ color: 'rgba(15,55,20,0.35)' }}>Shown as a reminder when logging the next visit on this job.</p>
         </div>
 
         {serverError && (

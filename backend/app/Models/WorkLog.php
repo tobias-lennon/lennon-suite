@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WorkLog extends Model
 {
-    protected $fillable = ['field_job_id', 'date', 'notes', 'has_waste_disposal', 'callout_fee'];
+    protected $fillable = ['field_job_id', 'date', 'notes', 'follow_up_note', 'has_waste_disposal', 'callout_fee'];
 
     protected function casts(): array
     {

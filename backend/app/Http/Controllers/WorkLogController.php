@@ -30,6 +30,7 @@ class WorkLogController extends Controller
         $data = $request->validate([
             'date'                          => 'required|date',
             'notes'                         => 'nullable|string',
+            'follow_up_note'                => 'nullable|string|max:1000',
             'callout_fee'                   => 'nullable|numeric|min:0',
             'has_waste_disposal'            => 'boolean',
             'entries'                       => 'array',
@@ -51,6 +52,7 @@ class WorkLogController extends Controller
         $log = $job->workLogs()->create([
             'date'               => $data['date'],
             'notes'              => $data['notes'] ?? null,
+            'follow_up_note'     => $data['follow_up_note'] ?? null,
             'callout_fee'        => $data['callout_fee'] ?? null,
             'has_waste_disposal' => $data['has_waste_disposal'] ?? false,
         ]);
@@ -106,6 +108,10 @@ class WorkLogController extends Controller
             $this->rateService->checkMaintenanceLoyalty($customer, $totalMaintenanceHours);
         }
 
+        if (in_array($job->status, ['backlog', 'scheduled'])) {
+            $job->update(['status' => 'in_progress']);
+        }
+
         $log->load(['entries.employee:id,name', 'materials']);
 
         return response()->json($log, 201);
@@ -127,6 +133,7 @@ class WorkLogController extends Controller
         $data = $request->validate([
             'date'               => 'sometimes|date',
             'notes'              => 'nullable|string',
+            'follow_up_note'     => 'nullable|string|max:1000',
             'callout_fee'        => 'nullable|numeric|min:0',
             'has_waste_disposal' => 'boolean',
         ]);

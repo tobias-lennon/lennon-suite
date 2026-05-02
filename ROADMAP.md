@@ -190,6 +190,31 @@ in-person purchases against a customer account.
 
 ---
 
+## Phase 1.6 — Suppliers & Contacts Directory
+*No dependencies. Can be built any time.*
+
+### What
+A simple contacts/directory module for external people and companies the business interacts with.
+
+**Types (single table, `type` field):**
+- `supplier_company` — material/product suppliers (e.g. builders merchants, plant wholesalers)
+- `supplier_individual` — sole traders who supply goods
+- `tradesman` — skilled individuals who can be brought onto a job (electrician, plumber, etc.)
+- `other` — general contacts
+
+**Fields per contact:**
+- Name, company name (optional), type, trade/specialty
+- Phone, email
+- Notes
+- Active/inactive flag
+
+**Tradesmen extras:** day rate (for cost tracking when subcontracted)
+**Supplier extras:** what they typically supply (free text or tags)
+
+**No linkage to jobs yet** — directory only for now. Future: attach a tradesman to a work log as a subcontractor cost.
+
+---
+
 ## Open Questions (resolve before each phase)
 
 - **Phase 3:** Do employees get app logins now, or later? Recommend now.

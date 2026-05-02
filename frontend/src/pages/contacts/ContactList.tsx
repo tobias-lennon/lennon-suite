@@ -3,95 +3,74 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../../lib/api'
 import Spinner from '../../components/Spinner'
 
-interface Lead {
+interface Contact {
   id: number
+  type: string
   name: string
+  company_name: string | null
+  specialty: string | null
   phone: string | null
   email: string | null
-  source: string
-  status: string
-  requires_site_visit: boolean
-  created_at: string
+  day_rate: string | null
+  is_active: boolean
 }
 
 interface Paginated {
-  data: Lead[]
+  data: Contact[]
   current_page: number
   last_page: number
   total: number
 }
 
-const STATUS_TABS = [
-  { value: '',             label: 'All' },
-  { value: 'new',          label: 'New' },
-  { value: 'contacted',    label: 'Contacted' },
-  { value: 'quoted',       label: 'Quoted' },
-  { value: 'site_visited', label: 'Site Visited' },
-  { value: 'won',          label: 'Won' },
-  { value: 'lost',         label: 'Lost' },
+const TYPE_TABS = [
+  { value: '',                   label: 'All' },
+  { value: 'supplier_company',   label: 'Supplier Co.' },
+  { value: 'supplier_individual', label: 'Supplier' },
+  { value: 'tradesman',          label: 'Tradesman' },
+  { value: 'other',              label: 'Other' },
 ]
 
-const STATUS_LABELS: Record<string, string> = {
-  new:          'New',
-  contacted:    'Contacted',
-  quoted:       'Quoted',
-  site_visited: 'Site Visited',
-  won:          'Won',
-  lost:         'Lost',
+const TYPE_LABELS: Record<string, string> = {
+  supplier_company:    'Supplier Co.',
+  supplier_individual: 'Supplier',
+  tradesman:           'Tradesman',
+  other:               'Other',
 }
 
-const SOURCE_LABELS: Record<string, string> = {
-  word_of_mouth: 'Word of Mouth',
-  google:        'Google',
-  instagram:     'Instagram',
-  referral:      'Referral',
-  other:         'Other',
-}
-
-function statusStyle(status: string) {
-  switch (status) {
-    case 'new':          return 'badge-new'
-    case 'contacted':    return 'badge-contacted'
-    case 'quoted':       return 'badge-quoted'
-    case 'site_visited': return 'badge-site-visit'
-    case 'won':          return 'badge-won'
-    case 'lost':         return 'badge-lost'
-    default:             return 'badge-backlog'
+function typeStyle(type: string) {
+  switch (type) {
+    case 'supplier_company':    return 'badge-scheduled'
+    case 'supplier_individual': return 'badge-quoted'
+    case 'tradesman':           return 'badge-site-visit'
+    default:                    return 'badge-backlog'
   }
 }
 
-function daysAgo(dateStr: string) {
-  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  return `${days}d ago`
-}
-
-export default function LeadList() {
+export default function ContactList() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const [result, setResult] = useState<Paginated | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   const search = params.get('search') ?? ''
-  const status = params.get('status') ?? ''
+  const type   = params.get('type') ?? ''
   const page   = parseInt(params.get('page') ?? '1')
 
   useEffect(() => {
     setIsLoading(true)
     const query: Record<string, string | number> = { page }
     if (search) query.search = search
-    if (status) query.status = status
-    api.get('/leads', { params: query })
+    if (type)   query.type   = type
+    api.get('/contacts', { params: query })
       .then(r => setResult(r.data))
       .finally(() => setIsLoading(false))
-  }, [search, status, page])
+  }, [search, type, page])
 
   function setAllParams(overrides: Record<string, string>) {
     const next: Record<string, string> = {}
     if (search) next.search = search
     next.page = String(page)
-    if (status) next.status = status
+    if (type) next.type = type
     Object.assign(next, overrides)
     Object.keys(next).forEach(k => { if (!next[k]) delete next[k] })
     setParams(next)
@@ -101,8 +80,8 @@ export default function LeadList() {
     setAllParams({ search: e.target.value, page: '1' })
   }
 
-  function handleStatus(value: string) {
-    setAllParams({ status: value, page: '1' })
+  function handleType(value: string) {
+    setAllParams({ type: value, page: '1' })
   }
 
   function setPage(p: number) {
@@ -115,28 +94,28 @@ export default function LeadList() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-brand-dark">Leads</h1>
+          <h1 className="text-2xl font-bold text-brand-dark">Contacts</h1>
           {result && (
             <p className="text-sm mt-0.5" style={{ color: 'rgba(15,55,20,0.45)' }}>{result.total.toLocaleString()} total</p>
           )}
         </div>
         <Link
-          to="/leads/new"
+          to="/contacts/new"
           className="text-sm font-bold px-4 py-2.5 rounded-lg transition-all hover:brightness-95"
           style={{ background: '#97B545', color: '#0F3714' }}
         >
-          + New Lead
+          + New Contact
         </Link>
       </div>
 
-      {/* Status tabs */}
+      {/* Type tabs */}
       <div className="flex gap-1.5 mb-4 overflow-x-auto scrollbar-none pb-0.5 flex-nowrap">
-        {STATUS_TABS.map(tab => (
+        {TYPE_TABS.map(tab => (
           <button
             key={tab.value}
-            onClick={() => handleStatus(tab.value)}
+            onClick={() => handleType(tab.value)}
             className="shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all"
-            style={status === tab.value
+            style={type === tab.value
               ? { background: '#0F3714', color: 'white' }
               : { background: 'rgba(255,255,255,0.7)', color: 'rgba(15,55,20,0.6)' }
             }
@@ -155,7 +134,7 @@ export default function LeadList() {
           type="text"
           value={search}
           onChange={handleSearch}
-          placeholder="Search by name, phone or email…"
+          placeholder="Search by name, specialty, phone or email…"
           className="field-input pl-10"
         />
       </div>
@@ -167,51 +146,52 @@ export default function LeadList() {
             <Spinner className="w-6 h-6 text-brand-lime" />
           </div>
         ) : result?.data.length === 0 ? (
-          <div className="p-12 text-center text-sm" style={{ color: 'rgba(15,55,20,0.4)' }}>No leads found.</div>
+          <div className="p-12 text-center text-sm" style={{ color: 'rgba(15,55,20,0.4)' }}>No contacts found.</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="thead-dark text-left">
                 <th>Name</th>
-                <th className="hidden md:table-cell">Source</th>
+                <th className="hidden md:table-cell">Specialty</th>
                 <th className="hidden md:table-cell">Phone</th>
-                <th>Status</th>
-                <th className="hidden sm:table-cell">Added</th>
+                <th>Type</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/4">
-              {result?.data.map(lead => (
+              {result?.data.map(contact => (
                 <tr
-                  key={lead.id}
-                  onClick={() => navigate(`/leads/${lead.id}/edit`)}
+                  key={contact.id}
+                  onClick={() => navigate(`/contacts/${contact.id}/edit`)}
                   className="tr-hover transition-colors cursor-pointer"
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-brand-dark">{lead.name}</span>
-                      {!!lead.requires_site_visit && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide" style={{ background: 'rgba(221,176,29,0.15)', color: '#9a7c0a' }}>
-                          Site Visit
+                      <span className="font-semibold text-brand-dark">{contact.name}</span>
+                      {!contact.is_active && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide" style={{ background: 'rgba(0,0,0,0.06)', color: '#6b7280' }}>
+                          Inactive
                         </span>
                       )}
                     </div>
+                    {contact.company_name && (
+                      <div className="text-xs mt-0.5" style={{ color: 'rgba(15,55,20,0.45)' }}>
+                        {contact.company_name}
+                      </div>
+                    )}
                     <div className="md:hidden text-xs mt-0.5" style={{ color: 'rgba(15,55,20,0.45)' }}>
-                      {SOURCE_LABELS[lead.source] ?? lead.source}
+                      {contact.specialty ?? contact.phone ?? '—'}
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell" style={{ color: 'rgba(15,55,20,0.55)' }}>
-                    {SOURCE_LABELS[lead.source] ?? lead.source}
+                    {contact.specialty ?? <span style={{ color: 'rgba(0,0,0,0.2)' }}>—</span>}
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-gray-600">
-                    {lead.phone ?? <span style={{ color: 'rgba(0,0,0,0.2)' }}>—</span>}
+                  <td className="px-4 py-3 hidden md:table-cell" style={{ color: 'rgba(15,55,20,0.55)' }}>
+                    {contact.phone ?? <span style={{ color: 'rgba(0,0,0,0.2)' }}>—</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`badge ${statusStyle(lead.status)}`}>
-                      {STATUS_LABELS[lead.status] ?? lead.status}
+                    <span className={`badge ${typeStyle(contact.type)}`}>
+                      {TYPE_LABELS[contact.type] ?? contact.type}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 hidden sm:table-cell text-xs" style={{ color: 'rgba(15,55,20,0.4)' }}>
-                    {daysAgo(lead.created_at)}
                   </td>
                 </tr>
               ))}

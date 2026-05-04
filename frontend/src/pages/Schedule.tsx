@@ -5,7 +5,7 @@ import Spinner from '../components/Spinner'
 
 interface CustomerForecastDay {
   date: string
-  condition: 'dry' | 'shower' | 'rain'
+  condition: string
 }
 
 interface JobSummary {
@@ -31,7 +31,7 @@ interface ScheduleData {
 
 interface Forecast {
   date: string
-  condition: 'dry' | 'shower' | 'rain'
+  condition: string
   temp_max: number
   precip_probability: number
 }
@@ -42,16 +42,42 @@ const STATUS_DOT: Record<string, string> = {
 const STATUS_LABEL: Record<string, string> = {
   backlog: 'Backlog', scheduled: 'Scheduled', in_progress: 'In Progress',
 }
-const CONDITION_ICON: Record<string, string> = { dry: '☀', shower: '🌦', rain: '🌧' }
+const CONDITION_ICON: Record<string, string> = {
+  sunny: '☀️', 'partly-cloudy': '⛅', cloudy: '☁️', fog: '🌫️',
+  drizzle: '🌦️', shower: '🌧️', rain: '🌧️', thunder: '⛈️', snow: '🌨️',
+}
+
+const DRY_CONDITIONS = new Set(['sunny', 'partly-cloudy', 'cloudy', 'fog'])
+const WET_LIGHT      = new Set(['drizzle'])
+const WET_MOD        = new Set(['shower'])
+const WET_HEAVY      = new Set(['rain', 'thunder', 'snow'])
 
 function getWeatherWarning(weatherReq: string | null, condition: string | undefined): 'none' | 'caution' | 'danger' {
-  if (!weatherReq || weatherReq === 'any' || !condition || condition === 'dry') return 'none'
-  if (weatherReq === 'dry_only') return (condition === 'rain' || condition === 'shower') ? 'danger' : 'none'
+  if (!weatherReq || weatherReq === 'any' || !condition) return 'none'
+  if (DRY_CONDITIONS.has(condition)) return 'none'
+  if (weatherReq === 'dry_only') return WET_LIGHT.has(condition) ? 'caution' : 'danger'
   if (weatherReq === 'dry_preferred') {
-    if (condition === 'rain') return 'danger'
-    if (condition === 'shower') return 'caution'
+    if (WET_HEAVY.has(condition)) return 'danger'
+    if (WET_MOD.has(condition) || WET_LIGHT.has(condition)) return 'caution'
   }
   return 'none'
+}
+
+function getWarningLabel(weatherReq: string, condition: string | undefined, warning: 'caution' | 'danger'): string {
+  if (warning === 'caution') {
+    if (condition === 'drizzle') return 'Drizzle expected'
+    return 'Showers expected'
+  }
+  if (weatherReq === 'dry_only') {
+    if (condition === 'thunder') return 'Thunder — not suitable'
+    if (condition === 'snow') return 'Snow — not suitable'
+    if (condition === 'rain') return 'Heavy rain — not suitable'
+    if (condition === 'drizzle') return 'Drizzle — use caution'
+    return 'Wet weather — not suitable'
+  }
+  if (condition === 'thunder') return 'Thunder forecast'
+  if (condition === 'snow') return 'Snow forecast'
+  return 'Rain forecast'
 }
 
 function addDays(dateStr: string, n: number): string {
@@ -94,9 +120,9 @@ function suggestDay(job: JobSummary, days: string[], hqForecasts: Forecast[]): s
 
   let candidates: string[]
   if (job.weather_req === 'dry_only') {
-    candidates = futureDays.filter(d => { const c = cond(d); return !c || c === 'dry' })
+    candidates = futureDays.filter(d => { const c = cond(d); return !c || DRY_CONDITIONS.has(c) })
   } else if (job.weather_req === 'dry_preferred') {
-    const dryDays = futureDays.filter(d => { const c = cond(d); return !c || c === 'dry' })
+    const dryDays = futureDays.filter(d => { const c = cond(d); return !c || DRY_CONDITIONS.has(c) })
     candidates = dryDays.length > 0 ? dryDays : futureDays
   } else {
     candidates = futureDays
@@ -157,9 +183,7 @@ function JobCard({ job, showAssign = false, showSuggest = false, days, assigning
                     color:      warning === 'danger' ? '#B84A2A' : '#9a7c0a',
                   }}
                 >
-                  ⚠ {warning === 'danger'
-                    ? (job.weather_req === 'dry_only' ? 'Dry only — unsuitable' : 'Rain forecast')
-                    : 'Prefers dry — showers expected'}
+                  ⚠ {getWarningLabel(job.weather_req ?? '', scheduledCondition, warning)}
                 </div>
               )}
             </div>

@@ -6,13 +6,13 @@ interface HourDetail {
   hour: string
   prob: number
   precip_mm: number
-  condition: 'dry' | 'shower' | 'rain'
+  condition: string
 }
 
 interface DayForecast {
   date: string
   day: string
-  condition: 'dry' | 'shower' | 'rain'
+  condition: string
   temp_max: number
   temp_min: number
   precip_probability: number
@@ -33,36 +33,98 @@ interface WeatherWidgetProps {
 
 function ConditionIcon({ condition, size = 'md' }: { condition: string; size?: 'sm' | 'md' }) {
   const cls = size === 'sm' ? 'w-3.5 h-3.5' : 'w-5 h-5'
-  if (condition === 'dry') return (
+
+  if (condition === 'sunny') return (
     <svg viewBox="0 0 24 24" className={cls} fill="currentColor">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+      <circle cx="12" cy="12" r="4.5" />
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M5.64 5.64l1.77 1.77M16.59 16.59l1.77 1.77M5.64 18.36l1.77-1.77M16.59 7.41l1.77-1.77"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
     </svg>
   )
+
+  if (condition === 'partly-cloudy') return (
+    <svg viewBox="0 0 24 24" className={cls} fill="currentColor">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M9 3v1.5M9 10.5V12M3 8h1.5M10.5 8H12M5.4 4.9l1.1 1.1M11.5 11l1.1 1.1M5.4 11.1l1.1-1.1M11.5 5l1.1-1.1"
+        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      <path d="M17 21H8a4 4 0 0 1-.9-7.9 5 5 0 0 1 9.7-.5A3 3 0 0 1 17 21z" />
+    </svg>
+  )
+
+  if (condition === 'cloudy') return (
+    <svg viewBox="0 0 24 24" className={cls} fill="currentColor">
+      <path d="M19 18H6a5 5 0 0 1-.7-9.9A7 7 0 0 1 19 10a5 5 0 0 1 0 8z" />
+    </svg>
+  )
+
+  if (condition === 'fog') return (
+    <svg viewBox="0 0 24 24" className={cls} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M3 7h18M3 11h16M3 15h12M3 19h8" />
+    </svg>
+  )
+
+  if (condition === 'drizzle') return (
+    <svg viewBox="0 0 24 24" className={cls} fill="currentColor">
+      <path d="M17 15H8a4 4 0 0 1-.6-7.9A6 6 0 0 1 17 9a4 4 0 0 1 0 6z" />
+      <path d="M9 18l-1 4M15 18l-1 4"
+        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+    </svg>
+  )
+
   if (condition === 'shower') return (
-    <svg viewBox="0 0 24 24" className={cls} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M20 17.58A5 5 0 0018 8h-1.26A8 8 0 104 15.25" />
-      <line x1="10" y1="16" x2="10" y2="19" />
-      <line x1="14" y1="16" x2="14" y2="19" />
+    <svg viewBox="0 0 24 24" className={cls} fill="currentColor">
+      <circle cx="18.5" cy="6" r="2.5" />
+      <path d="M18.5 1.5V3M18.5 9v1.5M13.5 6H15M20.5 6H22M15.3 3.3l1.1 1.1M20.7 8.7l1.1 1.1M15.3 8.7l1.1-1.1M20.7 3.3l1.1-1.1"
+        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      <path d="M15 17H6a4 4 0 0 1-.9-7.9A5 5 0 0 1 14.7 9h.3a3 3 0 0 1 0 8z" />
+      <path d="M7 19l-1 4M11 19l-1 4M15 19l-1 4"
+        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
     </svg>
   )
+
   if (condition === 'rain') return (
-    <svg viewBox="0 0 24 24" className={cls} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M20 17.58A5 5 0 0018 8h-1.26A8 8 0 104 15.25" />
-      <line x1="8" y1="16" x2="8" y2="19" /><line x1="12" y1="16" x2="12" y2="21" /><line x1="16" y1="16" x2="16" y2="19" />
+    <svg viewBox="0 0 24 24" className={cls} fill="currentColor">
+      <path d="M19 15H6a5 5 0 0 1-.7-9.9A7 7 0 0 1 19 7a5 5 0 0 1 0 8z" />
+      <path d="M6 18l-1.5 5M10 18l-1.5 5M14 18l-1.5 5M18 18l-1.5 5"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
     </svg>
   )
+
+  if (condition === 'thunder') return (
+    <svg viewBox="0 0 24 24" className={cls} fill="currentColor">
+      <path d="M19 13H6a5 5 0 0 1-.7-9.9A7 7 0 0 1 19 5a5 5 0 0 1 0 8z" />
+      <path d="M13 13l-3 5h5l-3 5"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  )
+
+  if (condition === 'snow') return (
+    <svg viewBox="0 0 24 24" className={cls} fill="currentColor">
+      <path d="M19 15H6a5 5 0 0 1-.7-9.9A7 7 0 0 1 19 7a5 5 0 0 1 0 8z" />
+      <circle cx="7" cy="20" r="1.5" />
+      <circle cx="12" cy="22" r="1.5" />
+      <circle cx="17" cy="20" r="1.5" />
+    </svg>
+  )
+
+  // fallback — plain cloud
   return (
-    <svg viewBox="0 0 24 24" className={cls} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z" />
+    <svg viewBox="0 0 24 24" className={cls} fill="currentColor">
+      <path d="M19 18H6a5 5 0 0 1-.7-9.9A7 7 0 0 1 19 10a5 5 0 0 1 0 8z" />
     </svg>
   )
 }
 
 const CONDITION_STYLES: Record<string, { bg: string; text: string; sub: string }> = {
-  dry:    { bg: 'rgba(151,181,69,0.12)', text: '#3a6e0f', sub: '#6a9a2a' },
-  shower: { bg: 'rgba(221,176,29,0.13)', text: '#7a5c00', sub: '#a07800' },
-  rain:   { bg: 'rgba(185,74,42,0.10)', text: '#8a2a0a', sub: '#c04010' },
+  sunny:          { bg: 'rgba(255,200,50,0.15)',  text: '#7a5c00', sub: '#c49000' },
+  'partly-cloudy':{ bg: 'rgba(151,181,69,0.13)',  text: '#3a6e0f', sub: '#5a9a20' },
+  cloudy:         { bg: 'rgba(0,0,0,0.05)',        text: '#555',    sub: '#777'    },
+  fog:            { bg: 'rgba(160,170,190,0.15)',  text: '#555',    sub: '#7a8a9a' },
+  drizzle:        { bg: 'rgba(100,160,220,0.15)',  text: '#1a4a7a', sub: '#3070bb' },
+  shower:         { bg: 'rgba(221,176,29,0.15)',   text: '#7a5c00', sub: '#a07800' },
+  rain:           { bg: 'rgba(185,74,42,0.12)',    text: '#8a2a0a', sub: '#c04010' },
+  thunder:        { bg: 'rgba(80,40,130,0.13)',    text: '#4a2070', sub: '#7040b0' },
+  snow:           { bg: 'rgba(190,215,240,0.22)',  text: '#1a4060', sub: '#3068a0' },
 }
 
 function isToday(dateStr: string): boolean {

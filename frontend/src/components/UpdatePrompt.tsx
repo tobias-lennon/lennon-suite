@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
 export default function UpdatePrompt() {
-  const { needRefresh: [needRefresh] } = useRegisterSW({
+  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW({
     onRegisteredSW(_swUrl, r) {
       if (!r) return
       r.update()
@@ -20,16 +20,6 @@ export default function UpdatePrompt() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
-  async function handleReload() {
-    const reg = await navigator.serviceWorker?.getRegistration()
-    if (reg?.waiting) {
-      navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true })
-      reg.waiting.postMessage({ type: 'SKIP_WAITING' })
-    } else {
-      window.location.reload()
-    }
-  }
-
   if (!needRefresh) return null
 
   return (
@@ -38,7 +28,7 @@ export default function UpdatePrompt() {
         <span className="text-[#97B545] text-lg">↑</span>
         <p className="text-sm font-medium">Update available</p>
         <button
-          onClick={handleReload}
+          onClick={() => updateServiceWorker(true)}
           className="bg-[#97B545] hover:bg-[#85a03d] text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors cursor-pointer"
         >
           Reload

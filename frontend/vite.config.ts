@@ -18,6 +18,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api/],
+        cleanupOutdatedCaches: true,
       },
     }),
   ],

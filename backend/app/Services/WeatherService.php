@@ -9,30 +9,30 @@ use Illuminate\Support\Facades\Log;
 class WeatherService
 {
     private const WMO_CONDITIONS = [
-        0  => 'dry',    // Clear sky
-        1  => 'dry',    // Mainly clear
-        2  => 'dry',    // Partly cloudy
-        3  => 'dry',    // Overcast (cloud, no rain)
-        45 => 'dry',    // Fog
-        48 => 'dry',    // Icy fog
-        51 => 'shower', // Light drizzle
-        53 => 'shower', // Moderate drizzle
-        55 => 'shower', // Dense drizzle
-        61 => 'shower', // Slight rain
-        63 => 'shower', // Moderate rain
-        65 => 'rain',   // Heavy rain
-        71 => 'shower', // Slight snow
-        73 => 'shower', // Moderate snow
-        75 => 'shower', // Heavy snow
-        77 => 'shower', // Snow grains
-        80 => 'shower', // Slight showers
-        81 => 'shower', // Moderate showers
-        82 => 'rain',   // Violent showers
-        85 => 'shower', // Snow showers
-        86 => 'shower', // Heavy snow showers
-        95 => 'rain',   // Thunderstorm
-        96 => 'rain',   // Thunderstorm with hail
-        99 => 'rain',   // Thunderstorm with heavy hail
+        0  => 'sunny',         // Clear sky
+        1  => 'sunny',         // Mainly clear
+        2  => 'partly-cloudy', // Partly cloudy
+        3  => 'cloudy',        // Overcast
+        45 => 'fog',           // Fog
+        48 => 'fog',           // Icy fog
+        51 => 'drizzle',       // Light drizzle
+        53 => 'drizzle',       // Moderate drizzle
+        55 => 'drizzle',       // Dense drizzle
+        61 => 'drizzle',       // Slight rain
+        63 => 'shower',        // Moderate rain
+        65 => 'rain',          // Heavy rain
+        71 => 'snow',          // Slight snow
+        73 => 'snow',          // Moderate snow
+        75 => 'snow',          // Heavy snow
+        77 => 'snow',          // Snow grains
+        80 => 'shower',        // Slight showers
+        81 => 'shower',        // Moderate showers
+        82 => 'rain',          // Violent showers
+        85 => 'snow',          // Snow showers
+        86 => 'snow',          // Heavy snow showers
+        95 => 'thunder',       // Thunderstorm
+        96 => 'thunder',       // Thunderstorm with hail
+        99 => 'thunder',       // Thunderstorm with heavy hail
     ];
 
     public function getForecast(float $lat, float $lng, int $days = 7): array

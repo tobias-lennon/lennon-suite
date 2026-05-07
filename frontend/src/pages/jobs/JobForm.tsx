@@ -70,10 +70,14 @@ export default function JobForm() {
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false)
   const [newCustomerForm, setNewCustomerForm] = useState({ name: '', type: 'residential', phone: '', email: '', eircode: '' })
   const [newCustomerErrors, setNewCustomerErrors] = useState<Record<string, string>>({})
+  const [newCustomerServerError, setNewCustomerServerError] = useState<string | null>(null)
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false)
 
   useEffect(() => {
-    if (!showNewCustomerModal) return
+    if (!showNewCustomerModal) {
+      setNewCustomerServerError(null)
+      return
+    }
     function handleKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setShowNewCustomerModal(false)
     }
@@ -89,6 +93,7 @@ export default function JobForm() {
     if (Object.keys(errs).length > 0) return
 
     setIsCreatingCustomer(true)
+    setNewCustomerServerError(null)
     try {
       const res = await api.post('/customers', {
         name:  newCustomerForm.name.trim(),
@@ -100,6 +105,8 @@ export default function JobForm() {
       selectCustomer({ id: res.data.id, name: res.data.name })
       setShowNewCustomerModal(false)
       setNewCustomerForm({ name: '', type: 'residential', phone: '', email: '', eircode: '' })
+    } catch {
+      setNewCustomerServerError('Failed to create customer. Please try again.')
     } finally {
       setIsCreatingCustomer(false)
     }
@@ -145,25 +152,27 @@ export default function JobForm() {
   // Load job for edit
   useEffect(() => {
     if (!isEdit) return
-    api.get(`/jobs/${id}`).then(res => {
-      const j = res.data
-      setForm({
-        customer_id: j.customer_id ? String(j.customer_id) : '',
-        title: j.title ?? '',
-        description: j.description ?? '',
-        type: j.type ?? 'standard',
-        status: j.status ?? 'backlog',
-        weather_req: j.weather_req ?? 'any',
-        est_duration: j.est_duration ?? '',
-        priority: j.priority ?? 'normal',
-        scheduled_date: j.scheduled_date ? j.scheduled_date.substring(0, 10) : '',
-        due_by: j.due_by ? j.due_by.substring(0, 10) : '',
-        notes: j.notes ?? '',
-        callout_fee: j.callout_fee != null ? String(j.callout_fee) : '',
+    api.get(`/jobs/${id}`)
+      .then(res => {
+        const j = res.data
+        setForm({
+          customer_id: j.customer_id ? String(j.customer_id) : '',
+          title: j.title ?? '',
+          description: j.description ?? '',
+          type: j.type ?? 'standard',
+          status: j.status ?? 'backlog',
+          weather_req: j.weather_req ?? 'any',
+          est_duration: j.est_duration ?? '',
+          priority: j.priority ?? 'normal',
+          scheduled_date: j.scheduled_date ? j.scheduled_date.substring(0, 10) : '',
+          due_by: j.due_by ? j.due_by.substring(0, 10) : '',
+          notes: j.notes ?? '',
+          callout_fee: j.callout_fee != null ? String(j.callout_fee) : '',
+        })
+        if (j.customer) setSelectedCustomerName(j.customer.name)
       })
-      if (j.customer) setSelectedCustomerName(j.customer.name)
-      setIsLoading(false)
-    })
+      .catch(() => navigate('/jobs'))
+      .finally(() => setIsLoading(false))
   }, [id, isEdit])
 
   function set(field: keyof FormState, value: string | boolean) {
@@ -595,6 +604,9 @@ export default function JobForm() {
                   className="field-input"
                 />
               </div>
+              {newCustomerServerError && (
+                <p className="text-xs text-danger">{newCustomerServerError}</p>
+              )}
               <div className="flex items-center gap-3 pt-1">
                 <button
                   type="submit"

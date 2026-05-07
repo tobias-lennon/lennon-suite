@@ -12,6 +12,7 @@ class FieldJob extends Model
     protected $fillable = [
         'customer_id',
         'project_id',
+        'assigned_to',
         'title',
         'description',
         'type',

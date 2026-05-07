@@ -37,7 +37,7 @@ class WeatherService
 
     public function getForecast(float $lat, float $lng, int $days = 7): array
     {
-        $cacheKey = "weather_{$lat}_{$lng}";
+        $cacheKey = 'weather_' . round($lat, 4) . '_' . round($lng, 4);
 
         return Cache::remember($cacheKey, 3600, function () use ($lat, $lng, $days) {
             return $this->fetchForecast($lat, $lng, $days);

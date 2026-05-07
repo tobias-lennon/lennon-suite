@@ -113,6 +113,7 @@ export default function JobDetail() {
   const { canEditJob, canDeleteJob, canCreateInvoice, canLogWork } = usePermissions()
   const [job, setJob] = useState<Job | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [expandedLogs, setExpandedLogs] = useState<Set<number>>(new Set())
   const [statusUpdating, setStatusUpdating] = useState(false)
   const [creatingInvoice, setCreatingInvoice] = useState(false)
@@ -131,7 +132,9 @@ export default function JobDetail() {
   }
 
   useEffect(() => {
-    loadJob().then(() => setIsLoading(false))
+    loadJob()
+      .then(() => setIsLoading(false))
+      .catch(() => { setLoadError(true); setIsLoading(false) })
   }, [id])
 
   function toggleLog(logId: number) {
@@ -280,6 +283,7 @@ export default function JobDetail() {
   }
 
   if (isLoading) return <div className="flex justify-center py-12"><Spinner /></div>
+  if (loadError) return <div className="p-6 text-gray-500">Could not load job. Please try again.</div>
   if (!job) return <div className="p-6 text-gray-500">Job not found.</div>
 
   const showInvoicePanel = job.status === 'complete' && job.type !== 'internal'
@@ -361,11 +365,11 @@ export default function JobDetail() {
         <Field label="Weather">{WEATHER_LABELS[job.weather_req]}</Field>
         {job.est_duration && <Field label="Duration">{DURATION_LABELS[job.est_duration]}</Field>}
         {job.scheduled_date && job.status !== 'backlog' && (
-          <Field label="Scheduled">{new Date(job.scheduled_date).toLocaleDateString('en-IE')}</Field>
+          <Field label="Scheduled">{new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-IE')}</Field>
         )}
         {job.due_by && job.status !== 'complete' && (() => {
           const today = new Date(); today.setHours(0,0,0,0)
-          const due = new Date(job.due_by)
+          const due = new Date(job.due_by + 'T12:00:00')
           const diff = Math.floor((due.getTime() - today.getTime()) / 86400000)
           const colour = diff < 0 ? '#B84A2A' : diff <= 7 ? '#DDB01D' : undefined
           return (

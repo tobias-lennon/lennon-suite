@@ -39,7 +39,7 @@ function fmt(val: number) {
 }
 
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export default function InvoiceList() {
@@ -57,10 +57,10 @@ export default function InvoiceList() {
     const params: Record<string, string> = { page: String(page) }
     if (statusFilter !== 'all') params.status = statusFilter
 
-    api.get('/invoices', { params }).then(res => {
-      setInvoices(res.data)
-      setIsLoading(false)
-    })
+    api.get('/invoices', { params })
+      .then(res => setInvoices(res.data))
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
   }, [statusFilter, page])
 
   function setStatus(s: string) {

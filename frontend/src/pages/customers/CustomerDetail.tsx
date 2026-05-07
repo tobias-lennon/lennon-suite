@@ -87,7 +87,7 @@ function jobStatusLabel(status: string) {
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export default function CustomerDetail() {

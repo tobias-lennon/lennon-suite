@@ -88,6 +88,7 @@ export default function InvoiceDetail() {
   const { canManageInvoice } = usePermissions()
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [downloadingReceipt, setDownloadingReceipt] = useState(false)
   const [statusUpdating, setStatusUpdating] = useState(false)
@@ -105,13 +106,15 @@ export default function InvoiceDetail() {
   const [isRecordingPayment, setIsRecordingPayment] = useState(false)
 
   useEffect(() => {
-    api.get(`/invoices/${id}`).then(res => {
-      setInvoice(res.data)
-      if (res.data.total_due) {
-        setPaymentForm(f => ({ ...f, amount_paid: res.data.total_due.toFixed(2) }))
-      }
-      setIsLoading(false)
-    })
+    api.get(`/invoices/${id}`)
+      .then(res => {
+        setInvoice(res.data)
+        if (res.data.total_due) {
+          setPaymentForm(f => ({ ...f, amount_paid: res.data.total_due.toFixed(2) }))
+        }
+      })
+      .catch(() => setLoadError(true))
+      .finally(() => setIsLoading(false))
   }, [id])
 
   async function updateStatus(status: string) {
@@ -167,6 +170,10 @@ export default function InvoiceDetail() {
 
   if (isLoading) {
     return <div className="flex justify-center py-12"><Spinner /></div>
+  }
+
+  if (loadError) {
+    return <div className="p-6 text-gray-500">Could not load invoice. Please try again.</div>
   }
 
   if (!invoice) {

@@ -87,7 +87,7 @@ const STATUS_LABELS: Record<string, string> = {
 function dueBadge(dueBy: string | null, status: string) {
   if (!dueBy || status === 'complete') return null
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const due = new Date(dueBy)
+  const due = new Date(dueBy + 'T12:00:00')
   const diff = Math.floor((due.getTime() - today.getTime()) / 86400000)
   if (diff < 0)  return <span style={{ color: '#B84A2A', fontWeight: 600 }} className="text-xs">Due {due.toLocaleDateString('en-IE')} · Overdue</span>
   if (diff <= 7) return <span style={{ color: '#DDB01D', fontWeight: 600 }} className="text-xs">Due {due.toLocaleDateString('en-IE')} · {diff === 0 ? 'Today' : `${diff}d`}</span>
@@ -99,6 +99,7 @@ export default function JobList() {
   const navigate = useNavigate()
   const [result, setResult] = useState<Paginated | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   const status = searchParams.get('status') ?? ''
   const search = searchParams.get('search') ?? ''
@@ -108,17 +109,16 @@ export default function JobList() {
   useEffect(() => {
     let cancelled = false
     setIsLoading(true)
+    setLoadError(false)
 
     const params: Record<string, string> = { page: String(page), sort }
     if (status) params.status = status
     if (search) params.search = search
 
-    api.get('/jobs', { params }).then(res => {
-      if (!cancelled) {
-        setResult(res.data)
-        setIsLoading(false)
-      }
-    })
+    api.get('/jobs', { params })
+      .then(res => { if (!cancelled) setResult(res.data) })
+      .catch(() => { if (!cancelled) setLoadError(true) })
+      .finally(() => { if (!cancelled) setIsLoading(false) })
 
     return () => { cancelled = true }
   }, [status, search, page, sort])
@@ -205,15 +205,22 @@ export default function JobList() {
         </div>
       )}
 
+      {/* Error */}
+      {!isLoading && loadError && (
+        <div className="text-center py-12 text-sm" style={{ color: 'rgba(185,74,42,0.8)' }}>
+          Could not load jobs. Please try again.
+        </div>
+      )}
+
       {/* Empty */}
-      {!isLoading && result?.data.length === 0 && (
+      {!isLoading && !loadError && result?.data.length === 0 && (
         <div className="text-center py-12" style={{ color: 'rgba(15,55,20,0.4)' }}>
           No jobs found.{' '}
           <Link to="/jobs/new" className="underline text-brand-lime">Add one?</Link>
         </div>
       )}
 
-      {!isLoading && (result?.data.length ?? 0) > 0 && (
+      {!isLoading && !loadError && (result?.data.length ?? 0) > 0 && (
         <>
           {/* Desktop table */}
           <div className="hidden md:block table-card">
@@ -255,7 +262,7 @@ export default function JobList() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: 'rgba(15,55,20,0.5)' }}>
-                      {job.scheduled_date && job.status !== 'backlog' ? new Date(job.scheduled_date).toLocaleDateString('en-IE') : '—'}
+                      {job.scheduled_date && job.status !== 'backlog' ? new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-IE') : '—'}
                     </td>
                     <td className="px-4 py-3">{dueBadge(job.due_by, job.status) ?? <span className="text-xs" style={{ color: 'rgba(15,55,20,0.3)' }}>—</span>}</td>
                     <td className="px-4 py-3 text-xs" style={{ color: 'rgba(15,55,20,0.5)' }}>{job.work_logs_count}</td>
@@ -294,7 +301,7 @@ export default function JobList() {
                     </span>
                   )}
                   {job.scheduled_date && job.status !== 'backlog' && (
-                    <span>{new Date(job.scheduled_date).toLocaleDateString('en-IE')}</span>
+                    <span>{new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-IE')}</span>
                   )}
                   {dueBadge(job.due_by, job.status)}
                   <InvoiceTag job={job} />

@@ -41,6 +41,7 @@ export default function CustomerList() {
   const navigate = useNavigate()
   const [result, setResult] = useState<Paginated | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   const search   = params.get('search') ?? ''
   const page     = parseInt(params.get('page') ?? '1')
@@ -49,6 +50,7 @@ export default function CustomerList() {
 
   useEffect(() => {
     setIsLoading(true)
+    setLoadError(false)
     api.get('/customers', {
       params: {
         search:   search   || undefined,
@@ -58,6 +60,7 @@ export default function CustomerList() {
       },
     })
       .then(r => setResult(r.data))
+      .catch(() => setLoadError(true))
       .finally(() => setIsLoading(false))
   }, [search, page, sortDir, activity])
 
@@ -143,7 +146,9 @@ export default function CustomerList() {
           <div className="p-12 flex justify-center">
             <Spinner className="w-6 h-6 text-brand-lime" />
           </div>
-        ) : result?.data.length === 0 ? (
+        ) : loadError ? (
+          <div className="p-12 text-center text-sm" style={{ color: 'rgba(185,74,42,0.8)' }}>Could not load customers. Please try again.</div>
+        ) : result?.data?.length === 0 ? (
           <div className="p-12 text-center text-sm" style={{ color: 'rgba(15,55,20,0.4)' }}>No customers found.</div>
         ) : (
           <table className="w-full text-sm">

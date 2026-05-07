@@ -44,6 +44,11 @@ class InvoiceController extends Controller
             return response()->json(['message' => 'This job has already been invoiced.'], 422);
         }
 
+        $job = \App\Models\FieldJob::findOrFail($data['field_job_id']);
+        if ($job->type === 'internal') {
+            return response()->json(['message' => 'Internal jobs cannot be invoiced.'], 422);
+        }
+
         $invoice = $this->invoiceService->generate(
             jobId:   $data['field_job_id'],
             dueDays: $data['due_days'] ?? null,

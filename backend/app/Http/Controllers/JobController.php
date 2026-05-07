@@ -128,6 +128,11 @@ class JobController extends Controller
             'callout_fee'        => 'nullable|numeric|min:0',
         ]);
 
+        // Internal jobs must not have a customer
+        if (($data['type'] ?? $job->type) === 'internal') {
+            $data['customer_id'] = null;
+        }
+
         $job->update($data);
 
         return response()->json($job->fresh('customer:id,name'));

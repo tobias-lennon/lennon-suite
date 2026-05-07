@@ -128,7 +128,9 @@ const CONDITION_STYLES: Record<string, { bg: string; text: string; sub: string }
 }
 
 function isToday(dateStr: string): boolean {
-  return dateStr === new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return dateStr === local
 }
 
 export default function WeatherWidget({ days, data: externalData, compact = false }: WeatherWidgetProps) {

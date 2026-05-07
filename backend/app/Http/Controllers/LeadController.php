@@ -96,6 +96,12 @@ class LeadController extends Controller
             'notes' => $lead->notes,
         ]);
 
+        if ($lead->eircode) {
+            $clean = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $lead->eircode));
+            $postcode = strlen($clean) === 7 ? substr($clean, 0, 3) . ' ' . substr($clean, 3) : $clean;
+            $customer->address()->create(['postcode' => $postcode]);
+        }
+
         $lead->update([
             'status'                => 'won',
             'converted_customer_id' => $customer->id,

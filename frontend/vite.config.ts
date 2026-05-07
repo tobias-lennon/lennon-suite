@@ -29,6 +29,15 @@ export default defineConfig({
   build: {
     outDir: '../backend/public',
     emptyOutDir: false,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+            return 'vendor'
+          }
+        },
+      },
+    },
   },
 
   test: {

@@ -90,7 +90,7 @@ function currentMonday(): string {
   const d = new Date()
   const day = d.getDay()
   d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day))
-  return d.toISOString().slice(0, 10)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function formatDate(dateStr: string): string {
@@ -269,6 +269,7 @@ export default function Schedule() {
   const [error, setError] = useState(false)
   const [assigningJobId, setAssigningJobId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const fetchSchedule = useCallback((ws: string) => {
     setLoading(true); setError(false)
@@ -287,6 +288,7 @@ export default function Schedule() {
 
   async function assignJob(job: JobSummary, targetDate: string | null) {
     setSaving(true)
+    setSaveError(null)
     try {
       const res = await api.patch(`/schedule/jobs/${job.id}/date`, { scheduled_date: targetDate })
       const updated: JobSummary = res.data
@@ -301,7 +303,9 @@ export default function Schedule() {
         }
       })
       setAssigningJobId(null)
-    } catch {}
+    } catch {
+      setSaveError('Could not save — please try again.')
+    }
     setSaving(false)
   }
 
@@ -322,6 +326,11 @@ export default function Schedule() {
         </div>
       </div>
 
+      {saveError && (
+        <p className="mb-4 text-center text-sm rounded-lg px-3 py-2" style={{ background: 'rgba(184,74,42,0.08)', color: '#B84A2A' }}>
+          {saveError}
+        </p>
+      )}
       {loading && <div className="flex justify-center py-12"><Spinner className="w-6 h-6 text-brand-lime" /></div>}
       {error && <p className="text-center text-sm text-gray-400 py-12">Could not load schedule. Please try again.</p>}
 

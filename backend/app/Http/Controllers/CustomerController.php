@@ -244,7 +244,8 @@ class CustomerController extends Controller
     public function history(Customer $customer): JsonResponse
     {
         $jobs = $customer->fieldJobs()
-            ->with('workLogs.entries')
+            ->with(['workLogs:id,field_job_id', 'workLogs.entries:id,work_log_id,amount_charged'])
+            ->withCount('workLogs')
             ->orderBy('scheduled_date', 'desc')
             ->orderBy('created_at', 'desc')
             ->get()
@@ -259,7 +260,7 @@ class CustomerController extends Controller
                     'type'            => $job->type,
                     'status'          => $job->status,
                     'scheduled_date'  => $job->scheduled_date?->toDateString(),
-                    'work_logs_count' => $job->workLogs->count(),
+                    'work_logs_count' => $job->work_logs_count,
                     'total_charged'   => round((float) $totalCharged, 2),
                 ];
             });
@@ -302,11 +303,21 @@ class CustomerController extends Controller
 
     public function stats(): JsonResponse
     {
+        $row = \DB::table('customers')
+            ->where('is_active', true)
+            ->selectRaw('
+                COUNT(*) as total,
+                SUM(type = "residential") as residential,
+                SUM(type = "commercial") as commercial,
+                SUM(email IS NOT NULL) as with_email
+            ')
+            ->first();
+
         return response()->json([
-            'total'       => Customer::where('is_active', true)->count(),
-            'residential' => Customer::where('is_active', true)->where('type', 'residential')->count(),
-            'commercial'  => Customer::where('is_active', true)->where('type', 'commercial')->count(),
-            'with_email'  => Customer::where('is_active', true)->whereNotNull('email')->count(),
+            'total'       => (int) $row->total,
+            'residential' => (int) $row->residential,
+            'commercial'  => (int) $row->commercial,
+            'with_email'  => (int) $row->with_email,
         ]);
     }
 }

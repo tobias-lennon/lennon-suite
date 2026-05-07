@@ -154,7 +154,10 @@ export default function WorkLogForm() {
   const isEdit = Boolean(logId)
   const navigate = useNavigate()
 
-  const [date, setDate] = useState(new Date().toISOString().substring(0, 10))
+  const [date, setDate] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
   const [notes, setNotes] = useState('')
   const [followUpNote, setFollowUpNote] = useState('')
   const [prevFollowUpNote, setPrevFollowUpNote] = useState<string | null>(null)

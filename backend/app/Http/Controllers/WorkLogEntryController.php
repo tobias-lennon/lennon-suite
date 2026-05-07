@@ -25,13 +25,14 @@ class WorkLogEntryController extends Controller
         ]);
 
         $job           = $log->fieldJob()->with('customer.rateCard')->first();
-        $customer      = $job->customer;
+        $isInternal    = $job->type === 'internal';
+        $customer      = $isInternal ? null : $job->customer;
         $employee      = Employee::find($data['employee_id']);
         $hasPowerTools = (bool) ($data['has_power_tools'] ?? false);
-        $rate          = $this->rateService->calculateRate($job, $customer, $hasPowerTools, (bool) $log->has_waste_disposal);
+        $rate          = $isInternal ? 0 : $this->rateService->calculateRate($job, $customer, $hasPowerTools, (bool) $log->has_waste_disposal);
         $hours         = (float) $data['billable_hours'];
 
-        $amountCharged = round($hours * $rate, 2);
+        $amountCharged = $isInternal ? 0 : round($hours * $rate, 2);
         $amountPaid    = round($hours * $employee->pay_rate, 2);
 
         $entry = WorkLogEntry::create([
@@ -44,13 +45,13 @@ class WorkLogEntryController extends Controller
             'billable_hours'  => $hours,
             'rate_per_hour'   => $rate,
             'pay_rate'        => $employee->pay_rate,
-            'discount_pct'    => $customer->discount_pct ?? 0,
+            'discount_pct'    => $customer?->discount_pct ?? 0,
             'amount_charged'  => $amountCharged,
             'amount_paid'     => $amountPaid,
             'margin'          => round($amountCharged - $amountPaid, 2),
         ]);
 
-        if ($job->type === 'maintenance') {
+        if ($job->type === 'maintenance' && $customer) {
             $this->rateService->checkMaintenanceLoyalty($customer, $hours);
         }
 

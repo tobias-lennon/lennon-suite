@@ -139,7 +139,7 @@ export default function Dashboard() {
               <StatCard label="Total"       value={stats?.total       ?? '—'} accent="#97B545" to="/customers"                animDelay={60}  />
               <StatCard label="Residential" value={stats?.residential ?? '—'} accent="#1D5823" to="/customers?type=residential" animDelay={120} />
               <StatCard label="Commercial"  value={stats?.commercial  ?? '—'} accent="#DDB01D" textAccent="#0F3714" to="/customers?type=commercial" animDelay={180} />
-              <StatCard label="With Email"  value={stats?.with_email  ?? '—'} accent="#F4BE29" sub="reachable" to="/customers?has_email=1"          animDelay={240} />
+              <StatCard label="With Email"  value={stats?.with_email  ?? '—'} accent="#F4BE29" sub="reachable" to="/customers"                       animDelay={240} />
             </>
           )}
         </div>

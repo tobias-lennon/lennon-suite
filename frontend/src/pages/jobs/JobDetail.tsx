@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../../lib/api'
-import { toTitleCase } from '../../lib/formatters'
+import { toTitleCase, formatEstimation } from '../../lib/formatters'
 import { usePermissions } from '../../hooks/usePermissions'
 import Spinner from '../../components/Spinner'
 import ConfirmDialog from '../../components/ConfirmDialog'
@@ -67,7 +67,7 @@ interface Job {
   type: string
   status: string
   weather_req: string
-  est_duration: string | null
+  estimated_hours: number | null
   priority: string
   scheduled_date: string | null
   due_by: string | null
@@ -94,9 +94,6 @@ const TYPE_LABELS: Record<string, string> = {
 }
 const WEATHER_LABELS: Record<string, string> = {
   any: 'Any', dry_preferred: 'Dry preferred', dry_only: 'Dry only',
-}
-const DURATION_LABELS: Record<string, string> = {
-  quick: 'Quick (<2hrs)', half_day: 'Half day', full_day: 'Full day', multi_day: 'Multi-day',
 }
 
 function fmt(val: number) {
@@ -363,7 +360,7 @@ export default function JobDetail() {
           </span>
         </Field>
         <Field label="Weather">{WEATHER_LABELS[job.weather_req]}</Field>
-        {job.est_duration && <Field label="Duration">{DURATION_LABELS[job.est_duration]}</Field>}
+        {job.estimated_hours != null && <Field label="Est. Duration">{formatEstimation(job.estimated_hours)}</Field>}
         {job.scheduled_date && job.status !== 'backlog' && (
           <Field label="Scheduled">{new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-IE')}</Field>
         )}

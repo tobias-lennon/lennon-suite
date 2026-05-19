@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../../lib/api'
-import { toTitleCase } from '../../lib/formatters'
+import { toTitleCase, formatEstimation } from '../../lib/formatters'
 import Spinner from '../../components/Spinner'
 
 function InvoiceTag({ job }: { job: Job }) {
@@ -37,6 +37,7 @@ interface Job {
   priority: 'normal' | 'high' | 'urgent'
   scheduled_date: string | null
   due_by: string | null
+  estimated_hours: number | null
   work_logs_count: number
   customer: { id: number; name: string; address?: { postcode: string | null } | null } | null
   invoice: InvoiceSummary | null
@@ -47,14 +48,15 @@ interface Paginated {
   current_page: number
   last_page: number
   total: number
+  estimated_hours_total: number
 }
 
 const STATUS_TABS = [
-  { value: '', label: 'All' },
+  { value: '', label: 'Active' },
   { value: 'backlog', label: 'Backlog' },
   { value: 'scheduled', label: 'Scheduled' },
   { value: 'in_progress', label: 'In Progress' },
-  { value: 'complete', label: 'Complete' },
+  { value: 'complete', label: 'Completed' },
 ]
 
 const TYPE_LABELS: Record<string, string> = {
@@ -89,9 +91,10 @@ function dueBadge(dueBy: string | null, status: string) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const due = new Date(dueBy + 'T12:00:00')
   const diff = Math.floor((due.getTime() - today.getTime()) / 86400000)
-  if (diff < 0)  return <span style={{ color: '#B84A2A', fontWeight: 600 }} className="text-xs">Due {due.toLocaleDateString('en-IE')} · Overdue</span>
-  if (diff <= 7) return <span style={{ color: '#DDB01D', fontWeight: 600 }} className="text-xs">Due {due.toLocaleDateString('en-IE')} · {diff === 0 ? 'Today' : `${diff}d`}</span>
-  return <span className="text-xs" style={{ color: 'rgba(15,55,20,0.5)' }}>Due {due.toLocaleDateString('en-IE')}</span>
+  if (diff < 0) return <span style={{ color: '#B84A2A', fontWeight: 600 }} className="text-xs">Due {due.toLocaleDateString('en-IE')} · Overdue</span>
+  const countdown = diff === 0 ? 'Today' : diff < 14 ? `${diff}d` : `${Math.round(diff / 7)}w`
+  const color = diff === 0 ? '#B84A2A' : diff <= 7 ? '#DDB01D' : 'rgba(15,55,20,0.5)'
+  return <span style={{ color, fontWeight: diff <= 7 ? 600 : 400 }} className="text-xs">Due {due.toLocaleDateString('en-IE')} · {countdown}</span>
 }
 
 export default function JobList() {
@@ -168,6 +171,21 @@ export default function JobList() {
         />
       </div>
 
+      {/* Backlog total — only shown on Active tab */}
+      {!isLoading && !loadError && !status && (result?.estimated_hours_total ?? 0) > 0 && (
+        <div
+          className="mb-4 px-4 py-3 rounded-xl flex items-center justify-between"
+          style={{ background: 'rgba(151,181,69,0.12)', border: '1px solid rgba(151,181,69,0.3)' }}
+        >
+          <span className="text-sm font-semibold" style={{ color: '#0F3714' }}>
+            Active backlog
+          </span>
+          <span className="text-sm font-bold" style={{ color: '#3a6e0f' }}>
+            {formatEstimation(result!.estimated_hours_total)} of work
+          </span>
+        </div>
+      )}
+
       {/* Status tabs */}
       <div className="flex gap-1.5 mb-4 overflow-x-auto scrollbar-none pb-0.5 flex-nowrap">
         {STATUS_TABS.map(tab => (
@@ -232,6 +250,7 @@ export default function JobList() {
                   <th>Type</th>
                   <th>Status</th>
                   <th>Priority</th>
+                  <th>Est.</th>
                   <th>Date</th>
                   <th>Due By</th>
                   <th>Logs</th>
@@ -260,6 +279,9 @@ export default function JobList() {
                           {job.priority.charAt(0).toUpperCase() + job.priority.slice(1)}
                         </span>
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-xs" style={{ color: 'rgba(15,55,20,0.5)' }}>
+                      {formatEstimation(job.estimated_hours) ?? '—'}
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: 'rgba(15,55,20,0.5)' }}>
                       {job.scheduled_date && job.status !== 'backlog' ? new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-IE') : '—'}
@@ -299,6 +321,9 @@ export default function JobList() {
                     <span className={`badge ${PRIORITY_COLOURS[job.priority]}`}>
                       {job.priority.charAt(0).toUpperCase() + job.priority.slice(1)}
                     </span>
+                  )}
+                  {job.estimated_hours != null && (
+                    <span>{formatEstimation(job.estimated_hours)}</span>
                   )}
                   {job.scheduled_date && job.status !== 'backlog' && (
                     <span>{new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-IE')}</span>

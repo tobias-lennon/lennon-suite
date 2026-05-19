@@ -80,17 +80,21 @@ function getWarningLabel(weatherReq: string, condition: string | undefined, warn
   return 'Rain forecast'
 }
 
+function localDateStr(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function addDays(dateStr: string, n: number): string {
   const d = new Date(dateStr + 'T12:00:00')
   d.setDate(d.getDate() + n)
-  return d.toISOString().slice(0, 10)
+  return localDateStr(d)
 }
 
 function currentMonday(): string {
   const d = new Date()
   const day = d.getDay()
   d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day))
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return localDateStr(d)
 }
 
 function formatDate(dateStr: string): string {
@@ -99,11 +103,11 @@ function formatDate(dateStr: string): string {
 }
 
 function isToday(dateStr: string): boolean {
-  return dateStr === new Date().toISOString().slice(0, 10)
+  return dateStr === localDateStr()
 }
 
 function isPast(dateStr: string): boolean {
-  return dateStr < new Date().toISOString().slice(0, 10)
+  return dateStr < localDateStr()
 }
 
 function getJobCondition(job: JobSummary, date: string, hqForecasts: Forecast[]): string | undefined {

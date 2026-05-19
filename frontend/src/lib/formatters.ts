@@ -30,6 +30,16 @@ export function formatPhone(phone: string | null): string | null {
   return phone
 }
 
+export function formatEstimation(hours: number | null | undefined): string | null {
+  if (!hours || hours <= 0) return null
+  const HOURS_PER_DAY = 6
+  const days = Math.floor(hours / HOURS_PER_DAY)
+  const remaining = Math.round((hours % HOURS_PER_DAY) * 10) / 10
+  if (days === 0) return `${remaining}h`
+  if (remaining === 0) return `${days}d`
+  return `${days}d ${remaining}h`
+}
+
 export function phoneHref(phone: string | null): string | null {
   if (!phone) return null
   const digits = phone.replace(/\D/g, '')

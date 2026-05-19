@@ -18,7 +18,7 @@ class FieldJob extends Model
         'type',
         'status',
         'weather_req',
-        'est_duration',
+        'estimated_hours',
         'priority',
         'scheduled_date',
         'due_by',
@@ -31,7 +31,8 @@ class FieldJob extends Model
         return [
             'scheduled_date' => 'date',
             'due_by'         => 'date',
-            'callout_fee'        => 'float',
+            'callout_fee'     => 'float',
+            'estimated_hours' => 'float',
         ];
     }
 

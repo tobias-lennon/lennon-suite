@@ -20,6 +20,8 @@ class JobController extends Controller
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
+        } else {
+            $query->whereNotIn('status', ['complete']);
         }
 
         if ($request->filled('type')) {
@@ -47,7 +49,26 @@ class JobController extends Controller
             default               => $query->orderBy('updated_at', 'desc'),
         };
 
-        return response()->json($query->paginate(25));
+        $paginated = $query->paginate(25);
+
+        // Backlog total: sum of estimated_hours across all active (non-complete) jobs matching current filters
+        $totalQuery = FieldJob::whereNotIn('status', ['complete']);
+        if ($request->filled('status')) {
+            $totalQuery = FieldJob::where('status', $request->status);
+        }
+        if ($request->filled('search')) {
+            $term = '%' . $request->search . '%';
+            $totalQuery->where(function ($q) use ($term) {
+                $q->where('title', 'like', $term)
+                  ->orWhereHas('customer', fn($c) => $c->where('name', 'like', $term));
+            });
+        }
+        $estimatedHoursTotal = (float) $totalQuery->sum('estimated_hours');
+
+        $result = $paginated->toArray();
+        $result['estimated_hours_total'] = $estimatedHoursTotal;
+
+        return response()->json($result);
     }
 
     public function store(Request $request): JsonResponse
@@ -60,7 +81,7 @@ class JobController extends Controller
             'type'              => 'required|in:standard,maintenance,site_visit,internal',
             'status'            => 'in:backlog,scheduled,in_progress,complete',
             'weather_req'       => 'in:any,dry_preferred,dry_only',
-            'est_duration'      => 'nullable|in:quick,half_day,full_day,multi_day',
+            'estimated_hours'   => 'nullable|numeric|min:0|max:999',
             'priority'          => 'in:normal,high,urgent',
             'scheduled_date'    => 'nullable|date',
             'due_by'            => 'nullable|date',
@@ -120,7 +141,7 @@ class JobController extends Controller
             'type'               => 'sometimes|in:standard,maintenance,site_visit,internal',
             'status'             => 'sometimes|in:backlog,scheduled,in_progress,complete',
             'weather_req'        => 'sometimes|in:any,dry_preferred,dry_only',
-            'est_duration'       => 'nullable|in:quick,half_day,full_day,multi_day',
+            'estimated_hours'    => 'nullable|numeric|min:0|max:999',
             'priority'           => 'sometimes|in:normal,high,urgent',
             'scheduled_date'     => 'nullable|date',
             'due_by'             => 'nullable|date',

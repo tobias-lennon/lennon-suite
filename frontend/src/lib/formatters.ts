@@ -30,6 +30,14 @@ export function formatPhone(phone: string | null): string | null {
   return phone
 }
 
+export function parseApiDate(dateStr: string): Date {
+  return new Date(dateStr.substring(0, 10) + 'T12:00:00')
+}
+
+export function fmtDate(dateStr: string, options?: Intl.DateTimeFormatOptions): string {
+  return parseApiDate(dateStr).toLocaleDateString('en-IE', options)
+}
+
 export function formatEstimation(hours: number | null | undefined): string | null {
   if (!hours || hours <= 0) return null
   const HOURS_PER_DAY = 6

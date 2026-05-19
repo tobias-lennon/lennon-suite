@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../../lib/api'
-import { toTitleCase, formatEstimation } from '../../lib/formatters'
+import { toTitleCase, formatEstimation, fmtDate } from '../../lib/formatters'
 import Spinner from '../../components/Spinner'
 
 function InvoiceTag({ job }: { job: Job }) {
@@ -89,7 +89,7 @@ const STATUS_LABELS: Record<string, string> = {
 function dueBadge(dueBy: string | null, status: string) {
   if (!dueBy || status === 'complete') return null
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const due = new Date(dueBy + 'T12:00:00')
+  const due = new Date(dueBy.substring(0, 10) + 'T12:00:00')
   const diff = Math.floor((due.getTime() - today.getTime()) / 86400000)
   if (diff < 0) return <span style={{ color: '#B84A2A', fontWeight: 600 }} className="text-xs">Due {due.toLocaleDateString('en-IE')} · Overdue</span>
   const countdown = diff === 0 ? 'Today' : diff < 14 ? `${diff}d` : `${Math.round(diff / 7)}w`
@@ -284,7 +284,7 @@ export default function JobList() {
                       {formatEstimation(job.estimated_hours) ?? '—'}
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: 'rgba(15,55,20,0.5)' }}>
-                      {job.scheduled_date && job.status !== 'backlog' ? new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-IE') : '—'}
+                      {job.scheduled_date && job.status !== 'backlog' ? fmtDate(job.scheduled_date) : '—'}
                     </td>
                     <td className="px-4 py-3">{dueBadge(job.due_by, job.status) ?? <span className="text-xs" style={{ color: 'rgba(15,55,20,0.3)' }}>—</span>}</td>
                     <td className="px-4 py-3 text-xs" style={{ color: 'rgba(15,55,20,0.5)' }}>{job.work_logs_count}</td>
@@ -326,7 +326,7 @@ export default function JobList() {
                     <span>{formatEstimation(job.estimated_hours)}</span>
                   )}
                   {job.scheduled_date && job.status !== 'backlog' && (
-                    <span>{new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-IE')}</span>
+                    <span>{fmtDate(job.scheduled_date)}</span>
                   )}
                   {dueBadge(job.due_by, job.status)}
                   <InvoiceTag job={job} />

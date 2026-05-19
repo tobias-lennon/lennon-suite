@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../../lib/api'
 import Spinner from '../../components/Spinner'
+import { fmtDate } from '../../lib/formatters'
 
 interface Invoice {
   id: number
@@ -39,7 +40,7 @@ function fmt(val: number) {
 }
 
 function formatDate(d: string) {
-  return new Date(d + 'T12:00:00').toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' })
+  return fmtDate(d, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export default function InvoiceList() {

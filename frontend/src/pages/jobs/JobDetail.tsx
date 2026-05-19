@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../../lib/api'
-import { toTitleCase, formatEstimation } from '../../lib/formatters'
+import { toTitleCase, formatEstimation, fmtDate } from '../../lib/formatters'
 import { usePermissions } from '../../hooks/usePermissions'
 import Spinner from '../../components/Spinner'
 import ConfirmDialog from '../../components/ConfirmDialog'
@@ -362,11 +362,11 @@ export default function JobDetail() {
         <Field label="Weather">{WEATHER_LABELS[job.weather_req]}</Field>
         {job.estimated_hours != null && <Field label="Est. Duration">{formatEstimation(job.estimated_hours)}</Field>}
         {job.scheduled_date && job.status !== 'backlog' && (
-          <Field label="Scheduled">{new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-IE')}</Field>
+          <Field label="Scheduled">{fmtDate(job.scheduled_date)}</Field>
         )}
         {job.due_by && job.status !== 'complete' && (() => {
           const today = new Date(); today.setHours(0,0,0,0)
-          const due = new Date(job.due_by + 'T12:00:00')
+          const due = new Date(job.due_by.substring(0, 10) + 'T12:00:00')
           const diff = Math.floor((due.getTime() - today.getTime()) / 86400000)
           const colour = diff < 0 ? '#B84A2A' : diff <= 7 ? '#DDB01D' : undefined
           return (
@@ -516,7 +516,7 @@ export default function JobDetail() {
                 >
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="text-sm font-medium text-gray-900">
-                      {new Date(log.date).toLocaleDateString('en-IE', { weekday: 'short', day: 'numeric', month: 'short' })}
+                      {fmtDate(log.date, { weekday: 'short', day: 'numeric', month: 'short' })}
                     </span>
                     <span className="text-xs text-gray-400">
                       {logHours.toFixed(2)}h · {fmt(logCharged)}
@@ -641,7 +641,7 @@ export default function JobDetail() {
                         <button
                           onClick={() => setConfirm({
                             title: 'Delete work log?',
-                            message: `Delete the log for ${new Date(log.date).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' })}? This cannot be undone.`,
+                            message: `Delete the log for ${fmtDate(log.date, { day: 'numeric', month: 'short' })}? This cannot be undone.`,
                             confirmLabel: 'Delete',
                             onConfirm: async () => { setConfirm(null); await deleteLog(log.id) },
                           })}

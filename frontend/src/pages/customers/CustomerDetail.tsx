@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../../lib/api'
-import { toTitleCase, formatPhone, phoneHref } from '../../lib/formatters'
+import { toTitleCase, formatPhone, phoneHref, fmtDate } from '../../lib/formatters'
 import { usePermissions } from '../../hooks/usePermissions'
 import Spinner from '../../components/Spinner'
 
@@ -87,7 +87,7 @@ function jobStatusLabel(status: string) {
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '—'
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' })
+  return fmtDate(dateStr, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export default function CustomerDetail() {

@@ -40,13 +40,12 @@ class JobController extends Controller
             });
         }
 
-        $sort = $request->get('sort', 'created_at_desc');
+        $sort = $request->get('sort', 'scheduled_date_asc');
         match ($sort) {
             'scheduled_date_asc'  => $query->orderByRaw('scheduled_date IS NULL, scheduled_date ASC'),
             'scheduled_date_desc' => $query->orderByRaw('scheduled_date IS NULL, scheduled_date DESC'),
             'due_by_asc'          => $query->orderByRaw('due_by IS NULL, due_by ASC'),
-            'priority_desc'       => $query->orderByRaw("FIELD(priority, 'urgent', 'high', 'normal')"),
-            default               => $query->orderBy('updated_at', 'desc'),
+            default               => $query->orderByRaw('scheduled_date IS NULL, scheduled_date ASC'),
         };
 
         $paginated = $query->paginate(25);

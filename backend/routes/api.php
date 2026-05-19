@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\JobTaskController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserController;
@@ -58,8 +59,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/weather',                          [WeatherController::class, 'hq']);
         Route::get('/weather/customers/{customer}',     [WeatherController::class, 'forCustomer']);
 
-        Route::get('/schedule',                         [ScheduleController::class, 'week']);
-        Route::patch('/schedule/jobs/{job}/date',       [ScheduleController::class, 'updateDate']);
+        Route::get('/schedule',                             [ScheduleController::class, 'week']);
+        Route::patch('/schedule/jobs/{job}/date',         [ScheduleController::class, 'updateDate']);
+        Route::patch('/schedule/tasks/{task}/date',       [ScheduleController::class, 'updateTaskDate']);
 
         Route::apiResource('/contacts', ContactController::class)->only(['index', 'show']);
     });
@@ -93,6 +95,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('/jobs', JobController::class)
             ->parameters(['jobs' => 'job'])
             ->only(['store', 'update', 'destroy']);
+
+        Route::post('/jobs/{job}/tasks',             [JobTaskController::class, 'store']);
+        Route::patch('/jobs/{job}/tasks/{task}',     [JobTaskController::class, 'update']);
+        Route::delete('/jobs/{job}/tasks/{task}',    [JobTaskController::class, 'destroy']);
 
         Route::apiResource('/invoices', InvoiceController::class)->only(['store', 'destroy']);
         Route::post('/invoices/{invoice}/payment',      [InvoiceController::class, 'recordPayment']);

@@ -79,7 +79,7 @@ class JobController extends Controller
             'description'       => 'nullable|string',
             'type'              => 'required|in:standard,maintenance,site_visit,internal',
             'status'            => 'in:backlog,scheduled,in_progress,complete',
-            'weather_req'       => 'in:any,dry_preferred,dry_only',
+            'weather_req'       => 'in:any,light_rain_ok,dry_preferred,dry_only,frost_free',
             'estimated_hours'   => 'nullable|numeric|min:0|max:999',
             'priority'          => 'in:normal,high,urgent',
             'scheduled_date'    => 'nullable|date',
@@ -109,6 +109,7 @@ class JobController extends Controller
             'customer.address',
             'customer.rateCard',
             'project:id,name',
+            'tasks',
             'workLogs' => fn($q) => $q->orderBy('date', 'desc'),
             'workLogs.entries.employee:id,name',
             'workLogs.materials',
@@ -124,7 +125,21 @@ class JobController extends Controller
             ->select('id', 'invoice_number', 'status', 'total_due', 'issued_date')
             ->first();
 
+        $tasks = $job->tasks->map(fn($t) => [
+            'id'              => $t->id,
+            'title'           => $t->title,
+            'estimated_hours' => $t->estimated_hours,
+            'weather_req'     => $t->weather_req,
+            'scheduled_date'  => $t->scheduled_date?->toDateString(),
+            'scheduled_time'  => $t->scheduled_time ? substr($t->scheduled_time, 0, 5) : null,
+            'status'          => $t->status,
+            'invoice_id'      => $t->invoice_id,
+            'sort_order'      => $t->sort_order,
+            'notes'           => $t->notes,
+        ])->values();
+
         return response()->json(array_merge($job->toArray(), [
+            'tasks'   => $tasks,
             'totals'  => $totals,
             'invoice' => $invoice,
         ]));
@@ -139,7 +154,7 @@ class JobController extends Controller
             'description'        => 'nullable|string',
             'type'               => 'sometimes|in:standard,maintenance,site_visit,internal',
             'status'             => 'sometimes|in:backlog,scheduled,in_progress,complete',
-            'weather_req'        => 'sometimes|in:any,dry_preferred,dry_only',
+            'weather_req'        => 'sometimes|in:any,light_rain_ok,dry_preferred,dry_only,frost_free',
             'estimated_hours'    => 'nullable|numeric|min:0|max:999',
             'priority'           => 'sometimes|in:normal,high,urgent',
             'scheduled_date'     => 'nullable|date',

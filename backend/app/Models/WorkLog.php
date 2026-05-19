@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WorkLog extends Model
 {
-    protected $fillable = ['field_job_id', 'date', 'notes', 'follow_up_note', 'has_waste_disposal', 'callout_fee'];
+    protected $fillable = ['field_job_id', 'job_task_id', 'date', 'notes', 'follow_up_note', 'has_waste_disposal', 'callout_fee'];
 
     protected function casts(): array
     {
@@ -22,6 +22,11 @@ class WorkLog extends Model
     public function fieldJob(): BelongsTo
     {
         return $this->belongsTo(FieldJob::class);
+    }
+
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(JobTask::class, 'job_task_id');
     }
 
     public function entries(): HasMany

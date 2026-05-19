@@ -51,6 +51,11 @@ class FieldJob extends Model
         return $this->hasMany(WorkLog::class);
     }
 
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(JobTask::class)->orderBy('sort_order');
+    }
+
     public function invoice(): HasOne
     {
         return $this->hasOne(Invoice::class);

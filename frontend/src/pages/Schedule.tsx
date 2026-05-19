@@ -21,12 +21,27 @@ interface JobSummary {
   customer: { id: number; name: string; minutes_from_hq: number | null } | null
 }
 
+interface TaskSummary {
+  id: number
+  title: string
+  status: string
+  weather_req: string
+  scheduled_date: string | null
+  scheduled_time: string | null
+  estimated_hours: number | null
+  customer_forecast: CustomerForecastDay[] | null
+  job: { id: number; title: string; customer: { id: number; name: string } | null } | null
+}
+
 interface ScheduleData {
   week_start: string
   week_end: string
   scheduled: JobSummary[]
   overdue: JobSummary[]
   unscheduled: JobSummary[]
+  scheduled_tasks: TaskSummary[]
+  overdue_tasks: TaskSummary[]
+  unscheduled_tasks: TaskSummary[]
 }
 
 interface Forecast {
@@ -60,7 +75,19 @@ function getWeatherWarning(weatherReq: string | null, condition: string | undefi
     if (WET_HEAVY.has(condition)) return 'danger'
     if (WET_MOD.has(condition) || WET_LIGHT.has(condition)) return 'caution'
   }
+  if (weatherReq === 'light_rain_ok') {
+    if (WET_HEAVY.has(condition)) return 'danger'
+    if (WET_MOD.has(condition)) return 'caution'
+  }
+  if (weatherReq === 'frost_free') {
+    if (condition === 'snow') return 'danger'
+  }
   return 'none'
+}
+
+function getTaskCondition(task: TaskSummary, date: string, hqForecasts: Forecast[]): string | undefined {
+  if (task.customer_forecast) return task.customer_forecast.find(f => f.date === date)?.condition
+  return hqForecasts.find(f => f.date === date)?.condition
 }
 
 function getWarningLabel(weatherReq: string, condition: string | undefined, warning: 'caution' | 'danger'): string {
@@ -265,6 +292,82 @@ function JobCard({ job, showAssign = false, showSuggest = false, days, assigning
   )
 }
 
+interface TaskCardProps {
+  task: TaskSummary
+  showAssign?: boolean
+  days: string[]
+  assigningTaskId: number | null
+  onToggleAssign: (id: number | null) => void
+  saving: boolean
+  onAssign: (task: TaskSummary, date: string | null) => void
+  forecasts: Forecast[]
+}
+
+function TaskCard({ task, showAssign = false, days, assigningTaskId, onToggleAssign, saving, onAssign, forecasts }: TaskCardProps) {
+  const isAssigning = assigningTaskId === task.id
+  const scheduledCondition = task.scheduled_date ? getTaskCondition(task, task.scheduled_date, forecasts) : undefined
+  const warning = getWeatherWarning(task.weather_req, scheduledCondition)
+
+  return (
+    <div className="rounded-xl border border-black/6 bg-white/70 p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <Link to={`/jobs/${task.job?.id}`} className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-brand-dark leading-snug">{task.title}</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+            {task.job?.customer && <p className="text-xs text-gray-400">{task.job.customer.name}</p>}
+            <p className="text-xs text-gray-400 italic">{task.job?.title}</p>
+            {task.scheduled_time && <p className="text-xs font-medium text-brand-dark/50">{task.scheduled_time}</p>}
+          </div>
+          {warning !== 'none' && (
+            <div
+              className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md"
+              style={{
+                background: warning === 'danger' ? 'rgba(184,74,42,0.1)' : 'rgba(221,176,29,0.15)',
+                color:      warning === 'danger' ? '#B84A2A' : '#9a7c0a',
+              }}
+            >
+              ⚠ {getWarningLabel(task.weather_req ?? '', scheduledCondition, warning)}
+            </div>
+          )}
+        </Link>
+        {showAssign && (
+          <button
+            onClick={() => onToggleAssign(isAssigning ? null : task.id)}
+            className="flex-shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+            style={{ background: isAssigning ? '#0F3714' : 'rgba(151,181,69,0.15)', color: isAssigning ? '#fff' : '#3a6e0f' }}
+          >
+            {isAssigning ? 'Cancel' : 'Assign'}
+          </button>
+        )}
+      </div>
+      {showAssign && (
+        <div style={{ maxHeight: isAssigning ? '300px' : '0', opacity: isAssigning ? 1 : 0, overflow: 'hidden', transition: isAssigning ? 'max-height 0.3s ease, opacity 0.2s ease' : 'none' }}>
+          <div className="mt-3 pt-3 border-t border-black/5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">Assign to:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {days.map(date => {
+                const fc = forecasts.find(f => f.date === date)
+                const dayWarning = getWeatherWarning(task.weather_req, getTaskCondition(task, date, forecasts))
+                return (
+                  <button key={date} disabled={saving} onClick={() => onAssign(task, date)}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                    style={{
+                      background: dayWarning === 'danger' ? 'rgba(184,74,42,0.12)' : dayWarning === 'caution' ? 'rgba(221,176,29,0.2)' : isToday(date) ? '#0F3714' : 'rgba(0,0,0,0.06)',
+                      color:      dayWarning === 'danger' ? '#B84A2A' : dayWarning === 'caution' ? '#9a7c0a' : isToday(date) ? '#fff' : '#444',
+                    }}
+                  >
+                    {fc ? `${CONDITION_ICON[fc.condition]} ` : ''}{formatDate(date)}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Schedule() {
   const [weekStart, setWeekStart] = useState(currentMonday)
   const [schedule, setSchedule] = useState<ScheduleData | null>(null)
@@ -272,6 +375,7 @@ export default function Schedule() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [assigningJobId, setAssigningJobId] = useState<number | null>(null)
+  const [assigningTaskId, setAssigningTaskId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -313,9 +417,33 @@ export default function Schedule() {
     setSaving(false)
   }
 
+  async function assignTask(task: TaskSummary, targetDate: string | null) {
+    setSaving(true); setSaveError(null)
+    try {
+      const res = await api.patch(`/schedule/tasks/${task.id}/date`, { scheduled_date: targetDate })
+      const updated: TaskSummary = res.data
+      setSchedule(prev => {
+        if (!prev) return prev
+        const allTasks = [...prev.scheduled_tasks, ...prev.overdue_tasks, ...prev.unscheduled_tasks].map(t => t.id === updated.id ? updated : t)
+        return {
+          ...prev,
+          scheduled_tasks:   allTasks.filter(t => t.scheduled_date !== null && t.scheduled_date >= prev.week_start && t.scheduled_date <= prev.week_end),
+          overdue_tasks:     allTasks.filter(t => t.scheduled_date !== null && t.scheduled_date < prev.week_start && t.status !== 'complete'),
+          unscheduled_tasks: allTasks.filter(t => t.scheduled_date === null),
+        }
+      })
+      setAssigningTaskId(null)
+    } catch {
+      setSaveError('Could not save — please try again.')
+    }
+    setSaving(false)
+  }
+
   const totalUnscheduled = (schedule?.unscheduled.length ?? 0) + (schedule?.overdue.length ?? 0)
+    + (schedule?.unscheduled_tasks.length ?? 0) + (schedule?.overdue_tasks.length ?? 0)
 
   const cardProps = { days, assigningJobId, onToggleAssign: setAssigningJobId, saving, onAssign: assignJob, forecasts }
+  const taskCardProps = { days, assigningTaskId, onToggleAssign: setAssigningTaskId, saving, onAssign: assignTask, forecasts }
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
@@ -348,7 +476,7 @@ export default function Schedule() {
                 <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-black/8 text-brand-dark/50">{totalUnscheduled}</span>
               </div>
 
-              {(schedule?.overdue.length ?? 0) > 0 && (
+              {((schedule?.overdue.length ?? 0) > 0 || (schedule?.overdue_tasks.length ?? 0) > 0) && (
                 <div className="mb-3">
                   <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: '#B84A2A' }}>Overdue</p>
                   <div className="flex flex-col gap-2">
@@ -357,13 +485,19 @@ export default function Schedule() {
                         <JobCard job={job} showAssign showSuggest {...cardProps} />
                       </div>
                     ))}
+                    {schedule!.overdue_tasks.map(task => (
+                      <div key={task.id} className="rounded-xl border-2 border-red-100">
+                        <TaskCard task={task} showAssign {...taskCardProps} />
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {(schedule?.unscheduled.length ?? 0) > 0 && (
+              {((schedule?.unscheduled.length ?? 0) > 0 || (schedule?.unscheduled_tasks.length ?? 0) > 0) && (
                 <div className="flex flex-col gap-2">
                   {schedule!.unscheduled.map(job => <JobCard key={job.id} job={job} showAssign showSuggest {...cardProps} />)}
+                  {schedule!.unscheduled_tasks.map(task => <TaskCard key={task.id} task={task} showAssign {...taskCardProps} />)}
                 </div>
               )}
             </div>
@@ -380,6 +514,7 @@ export default function Schedule() {
             <div className="flex flex-col gap-3">
               {days.map(date => {
                 const jobs = schedule?.scheduled.filter(j => j.scheduled_date === date) ?? []
+                const tasks = schedule?.scheduled_tasks.filter(t => t.scheduled_date === date) ?? []
                 const forecast = forecasts.find(f => f.date === date)
                 const today = isToday(date)
                 const past = isPast(date)
@@ -400,9 +535,9 @@ export default function Schedule() {
                           <p className="text-sm font-bold" style={{ color: today ? '#97B545' : past ? '#aaa' : '#0F3714' }}>
                             {formatDate(date)}
                           </p>
-                          {jobs.length > 0 && (
+                          {(jobs.length > 0 || tasks.length > 0) && (
                             <p className="text-[11px]" style={{ color: today ? 'rgba(255,255,255,0.5)' : '#999' }}>
-                              {jobs.length} job{jobs.length !== 1 ? 's' : ''}
+                              {[jobs.length > 0 && `${jobs.length} job${jobs.length !== 1 ? 's' : ''}`, tasks.length > 0 && `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
                             </p>
                           )}
                         </div>
@@ -417,21 +552,26 @@ export default function Schedule() {
                       )}
                     </div>
 
-                    {/* Jobs */}
-                    {jobs.length > 0 ? (
+                    {/* Jobs + Tasks */}
+                    {(jobs.length > 0 || tasks.length > 0) ? (
                       <div className="p-3 flex flex-col gap-2">
                         {jobs.map(job => (
                           <div key={job.id} className="flex items-center gap-2">
-                            <div className="flex-1">
-                              <JobCard job={job} {...cardProps} />
-                            </div>
-                            <button
-                              onClick={() => assignJob(job, null)}
+                            <div className="flex-1"><JobCard job={job} {...cardProps} /></div>
+                            <button onClick={() => assignJob(job, null)}
                               className="flex-shrink-0 text-xs text-gray-400 hover:text-red-400 transition-colors cursor-pointer px-1"
-                              title="Unschedule"
-                            >
-                              ×
-                            </button>
+                              title="Unschedule">×</button>
+                          </div>
+                        ))}
+                        {tasks.length > 0 && jobs.length > 0 && (
+                          <p className="text-[10px] font-bold uppercase tracking-wider mt-1 mb-0.5" style={{ color: 'rgba(15,55,20,0.35)' }}>Tasks</p>
+                        )}
+                        {tasks.map(task => (
+                          <div key={task.id} className="flex items-center gap-2">
+                            <div className="flex-1"><TaskCard task={task} {...taskCardProps} /></div>
+                            <button onClick={() => assignTask(task, null)}
+                              className="flex-shrink-0 text-xs text-gray-400 hover:text-red-400 transition-colors cursor-pointer px-1"
+                              title="Unschedule">×</button>
                           </div>
                         ))}
                       </div>
@@ -444,7 +584,7 @@ export default function Schedule() {
             </div>
           </div>
 
-          {totalUnscheduled === 0 && schedule?.scheduled.length === 0 && (
+          {totalUnscheduled === 0 && schedule?.scheduled.length === 0 && schedule?.scheduled_tasks.length === 0 && (
             <div className="text-center py-10">
               <p className="text-sm text-gray-400">No jobs to schedule.</p>
               <Link to="/jobs/new" className="inline-block mt-2 text-xs font-semibold text-brand-lime hover:underline">+ Add a job</Link>

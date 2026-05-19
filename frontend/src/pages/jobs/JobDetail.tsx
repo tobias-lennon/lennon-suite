@@ -60,6 +60,19 @@ interface InvoiceSummary {
   total_due: number
   issued_date: string
 }
+interface JobTask {
+  id: number
+  title: string
+  estimated_hours: number | null
+  weather_req: string
+  scheduled_date: string | null
+  scheduled_time: string | null
+  status: 'pending' | 'in_progress' | 'complete'
+  invoice_id: number | null
+  sort_order: number
+  notes: string | null
+}
+
 interface Job {
   id: number
   title: string
@@ -68,11 +81,11 @@ interface Job {
   status: string
   weather_req: string
   estimated_hours: number | null
-
   scheduled_date: string | null
   due_by: string | null
   notes: string | null
   callout_fee: number | null
+  tasks: JobTask[]
   customer: { id: number; name: string; phone: string | null; discount_pct: number }
   project: { id: number; name: string } | null
   work_logs: WorkLog[]
@@ -93,7 +106,10 @@ const TYPE_LABELS: Record<string, string> = {
   standard: 'Standard', maintenance: 'Maintenance', site_visit: 'Site Visit', internal: 'Internal',
 }
 const WEATHER_LABELS: Record<string, string> = {
-  any: 'Any', dry_preferred: 'Dry preferred', dry_only: 'Dry only',
+  any: 'Any', light_rain_ok: 'Light rain OK', dry_preferred: 'Dry preferred', dry_only: 'Dry only', frost_free: 'Frost free',
+}
+const TASK_WEATHER_SHORT: Record<string, string> = {
+  any: 'Any', light_rain_ok: '🌧 OK', dry_preferred: 'Dry pref.', dry_only: 'Dry only', frost_free: 'No frost',
 }
 
 function fmt(val: number) {
@@ -115,6 +131,16 @@ export default function JobDetail() {
   const [statusUpdating, setStatusUpdating] = useState(false)
   const [creatingInvoice, setCreatingInvoice] = useState(false)
   const [openEntryLogIds, setOpenEntryLogIds] = useState<Set<number>>(new Set())
+  const [taskForm, setTaskForm] = useState<{
+    id: number | null
+    title: string
+    estimated_hours: string
+    weather_req: string
+    scheduled_date: string
+    scheduled_time: string
+    notes: string
+  } | null>(null)
+  const [savingTask, setSavingTask] = useState(false)
 
   // Single confirm dialog state — covers all confirmations
   const [confirm, setConfirm] = useState<{
@@ -175,6 +201,57 @@ export default function JobDetail() {
 
   async function deleteLog(logId: number) {
     await api.delete(`/jobs/${id}/logs/${logId}`)
+    await loadJob()
+  }
+
+  function openAddTask() {
+    setTaskForm({ id: null, title: '', estimated_hours: '', weather_req: 'any', scheduled_date: '', scheduled_time: '', notes: '' })
+  }
+  function openEditTask(task: JobTask) {
+    setTaskForm({
+      id: task.id,
+      title: task.title,
+      estimated_hours: task.estimated_hours != null ? String(task.estimated_hours) : '',
+      weather_req: task.weather_req,
+      scheduled_date: task.scheduled_date ?? '',
+      scheduled_time: task.scheduled_time ?? '',
+      notes: task.notes ?? '',
+    })
+  }
+  function closeTaskForm() { setTaskForm(null) }
+
+  async function saveTask() {
+    if (!taskForm || !taskForm.title.trim()) return
+    setSavingTask(true)
+    const payload = {
+      title: taskForm.title.trim(),
+      estimated_hours: taskForm.estimated_hours ? parseFloat(taskForm.estimated_hours) : null,
+      weather_req: taskForm.weather_req,
+      scheduled_date: taskForm.scheduled_date || null,
+      scheduled_time: taskForm.scheduled_time || null,
+      notes: taskForm.notes || null,
+    }
+    try {
+      if (taskForm.id) {
+        await api.patch(`/jobs/${id}/tasks/${taskForm.id}`, payload)
+      } else {
+        await api.post(`/jobs/${id}/tasks`, payload)
+      }
+      closeTaskForm()
+      await loadJob()
+    } finally {
+      setSavingTask(false)
+    }
+  }
+
+  async function deleteTask(taskId: number) {
+    await api.delete(`/jobs/${id}/tasks/${taskId}`)
+    await loadJob()
+  }
+
+  async function cycleTaskStatus(task: JobTask) {
+    const next = task.status === 'pending' ? 'in_progress' : task.status === 'in_progress' ? 'complete' : 'pending'
+    await api.patch(`/jobs/${id}/tasks/${task.id}`, { status: next })
     await loadJob()
   }
 
@@ -389,6 +466,162 @@ export default function JobDetail() {
           <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.notes}</p>
         </div>
       )}
+
+      {/* Tasks */}
+      <div className="card overflow-hidden mb-6">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-black/5">
+          <h2 className="section-label mb-0">
+            Tasks
+            {job.tasks.length > 0 && <span className="ml-1.5 text-xs font-normal" style={{ color: 'rgba(15,55,20,0.4)' }}>({job.tasks.length})</span>}
+          </h2>
+          {canEditJob && (
+            <button
+              onClick={openAddTask}
+              className="text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors"
+              style={{ background: 'rgba(151,181,69,0.15)', color: '#3a6e0f' }}
+            >
+              + Add task
+            </button>
+          )}
+        </div>
+
+        {job.tasks.length === 0 && !taskForm && (
+          <p className="text-sm text-center py-5" style={{ color: 'rgba(15,55,20,0.35)' }}>
+            No tasks — add steps to schedule and track work separately.
+          </p>
+        )}
+
+        {job.tasks.map(task => (
+          <div key={task.id} className="border-b border-black/4 last:border-0">
+            <div className="flex items-center gap-3 px-4 py-3">
+              <button
+                onClick={() => cycleTaskStatus(task)}
+                className="shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all"
+                style={
+                  task.status === 'complete'    ? { background: '#97B545', borderColor: '#97B545' }
+                  : task.status === 'in_progress' ? { background: 'rgba(221,176,29,0.3)', borderColor: '#DDB01D' }
+                  : { background: 'transparent', borderColor: 'rgba(15,55,20,0.25)' }
+                }
+                title="Click to advance status"
+              >
+                {task.status === 'complete' && (
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+
+              <button className="flex-1 text-left min-w-0" onClick={() => canEditJob && openEditTask(task)}>
+                <span className={`text-sm font-medium ${task.status === 'complete' ? 'line-through' : 'text-brand-dark'}`}
+                  style={task.status === 'complete' ? { color: 'rgba(15,55,20,0.35)' } : {}}>
+                  {task.title}
+                </span>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(15,55,20,0.07)', color: 'rgba(15,55,20,0.5)' }}>
+                    {TASK_WEATHER_SHORT[task.weather_req] ?? task.weather_req}
+                  </span>
+                  {task.scheduled_date && (
+                    <span className="text-xs" style={{ color: 'rgba(15,55,20,0.45)' }}>
+                      {fmtDate(task.scheduled_date, { weekday: 'short', day: 'numeric', month: 'short' })}
+                      {task.scheduled_time && ` · ${task.scheduled_time}`}
+                    </span>
+                  )}
+                  {task.estimated_hours != null && (
+                    <span className="text-xs" style={{ color: 'rgba(15,55,20,0.45)' }}>{formatEstimation(task.estimated_hours)}</span>
+                  )}
+                  {task.invoice_id && (
+                    <span className="text-xs px-1.5 py-0.5 rounded badge-paid">Invoiced</span>
+                  )}
+                </div>
+              </button>
+
+              {canEditJob && (
+                <button
+                  onClick={() => setConfirm({
+                    title: 'Delete task?',
+                    message: `Delete "${task.title}"? This cannot be undone.`,
+                    confirmLabel: 'Delete',
+                    onConfirm: async () => { setConfirm(null); await deleteTask(task.id) },
+                  })}
+                  className="shrink-0 transition-colors"
+                  style={{ color: 'rgba(15,55,20,0.2)' }}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {taskForm && (
+          <div className="px-4 py-4 border-t border-black/5" style={{ background: 'rgba(15,55,20,0.025)' }}>
+            <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'rgba(15,55,20,0.45)' }}>
+              {taskForm.id ? 'Edit task' : 'New task'}
+            </p>
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Task title"
+                value={taskForm.title}
+                onChange={e => setTaskForm(f => f && { ...f, title: e.target.value })}
+                className="field-input"
+                autoFocus
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Weather</label>
+                  <select value={taskForm.weather_req} onChange={e => setTaskForm(f => f && { ...f, weather_req: e.target.value })} className="field-input">
+                    <option value="any">Any conditions</option>
+                    <option value="light_rain_ok">Light rain OK</option>
+                    <option value="dry_preferred">Dry preferred</option>
+                    <option value="dry_only">Dry only</option>
+                    <option value="frost_free">Frost free</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Est. hours</label>
+                  <input type="number" min="0" max="999" step="0.5" placeholder="e.g. 6"
+                    value={taskForm.estimated_hours}
+                    onChange={e => setTaskForm(f => f && { ...f, estimated_hours: e.target.value })}
+                    className="field-input" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Date</label>
+                  <input type="date" value={taskForm.scheduled_date}
+                    onChange={e => setTaskForm(f => f && { ...f, scheduled_date: e.target.value })}
+                    className="field-input" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Time</label>
+                  <input type="time" value={taskForm.scheduled_time}
+                    onChange={e => setTaskForm(f => f && { ...f, scheduled_time: e.target.value })}
+                    className="field-input" />
+                </div>
+              </div>
+              <textarea placeholder="Notes (optional)" rows={2}
+                value={taskForm.notes}
+                onChange={e => setTaskForm(f => f && { ...f, notes: e.target.value })}
+                className="field-input resize-none" />
+              <div className="flex gap-2">
+                <button onClick={saveTask} disabled={savingTask || !taskForm.title.trim()}
+                  className="px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-50"
+                  style={{ background: '#0F3714' }}>
+                  {savingTask ? 'Saving…' : taskForm.id ? 'Save changes' : 'Add task'}
+                </button>
+                <button onClick={closeTaskForm}
+                  className="px-4 py-2 text-sm font-medium rounded-lg"
+                  style={{ color: 'rgba(15,55,20,0.6)' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Totals */}
       {job.work_logs.length > 0 && (

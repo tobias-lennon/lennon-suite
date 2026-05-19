@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\FieldJob;
+use App\Models\JobTask;
 use App\Services\WeatherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,16 +44,43 @@ class ScheduleController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        $forecastsByCoords = $this->buildForecastsMap(
-            $scheduled->merge($overdue)->merge($unscheduled)
-        );
+        $scheduledTasks = JobTask::with(['job.customer:id,name,minutes_from_hq,latitude,longitude'])
+            ->whereNotNull('scheduled_date')
+            ->whereBetween('scheduled_date', [$weekStart->toDateString(), $weekEnd->toDateString()])
+            ->whereNotIn('status', ['complete'])
+            ->orderBy('scheduled_date')
+            ->orderBy('scheduled_time')
+            ->get();
+
+        $overdueTasks = JobTask::with(['job.customer:id,name,minutes_from_hq,latitude,longitude'])
+            ->whereNotNull('scheduled_date')
+            ->where('scheduled_date', '<', $weekStart->toDateString())
+            ->whereNotIn('status', ['complete'])
+            ->orderBy('scheduled_date')
+            ->get();
+
+        $unscheduledTasks = JobTask::with(['job.customer:id,name,minutes_from_hq,latitude,longitude'])
+            ->whereNull('scheduled_date')
+            ->whereNotIn('status', ['complete'])
+            ->orderBy('sort_order')
+            ->get();
+
+        $allJobs = $scheduled->merge($overdue)->merge($unscheduled)
+            ->merge($scheduledTasks->map->job)
+            ->merge($overdueTasks->map->job)
+            ->merge($unscheduledTasks->map->job);
+
+        $forecastsByCoords = $this->buildForecastsMap($allJobs->filter());
 
         return response()->json([
-            'week_start'  => $weekStart->toDateString(),
-            'week_end'    => $weekEnd->toDateString(),
-            'scheduled'   => $scheduled->map(fn($j) => $this->jobSummary($j, $forecastsByCoords))->values(),
-            'overdue'     => $overdue->map(fn($j) => $this->jobSummary($j, $forecastsByCoords))->values(),
-            'unscheduled' => $unscheduled->map(fn($j) => $this->jobSummary($j, $forecastsByCoords))->values(),
+            'week_start'        => $weekStart->toDateString(),
+            'week_end'          => $weekEnd->toDateString(),
+            'scheduled'         => $scheduled->map(fn($j) => $this->jobSummary($j, $forecastsByCoords))->values(),
+            'overdue'           => $overdue->map(fn($j) => $this->jobSummary($j, $forecastsByCoords))->values(),
+            'unscheduled'       => $unscheduled->map(fn($j) => $this->jobSummary($j, $forecastsByCoords))->values(),
+            'scheduled_tasks'   => $scheduledTasks->map(fn($t) => $this->taskSummary($t, $forecastsByCoords))->values(),
+            'overdue_tasks'     => $overdueTasks->map(fn($t) => $this->taskSummary($t, $forecastsByCoords))->values(),
+            'unscheduled_tasks' => $unscheduledTasks->map(fn($t) => $this->taskSummary($t, $forecastsByCoords))->values(),
         ]);
     }
 
@@ -68,6 +96,20 @@ class ScheduleController extends Controller
         $forecastsByCoords = $this->buildForecastsMap(collect([$fresh]));
 
         return response()->json($this->jobSummary($fresh, $forecastsByCoords));
+    }
+
+    public function updateTaskDate(Request $request, JobTask $task): JsonResponse
+    {
+        $data = $request->validate([
+            'scheduled_date' => 'nullable|date',
+        ]);
+
+        $task->update(['scheduled_date' => $data['scheduled_date']]);
+
+        $fresh = $task->fresh()->load('job.customer:id,name,minutes_from_hq,latitude,longitude');
+        $forecastsByCoords = $this->buildForecastsMap(collect([$fresh->job])->filter());
+
+        return response()->json($this->taskSummary($fresh, $forecastsByCoords));
     }
 
     private function buildForecastsMap($jobs): array
@@ -114,9 +156,41 @@ class ScheduleController extends Controller
             'weather_req'       => $job->weather_req,
             'customer_forecast' => $customerForecast,
             'customer'          => $c ? [
-                'id'             => $c->id,
-                'name'           => $c->name,
+                'id'              => $c->id,
+                'name'            => $c->name,
                 'minutes_from_hq' => $c->minutes_from_hq,
+            ] : null,
+        ];
+    }
+
+    private function taskSummary(JobTask $task, array $forecastsByCoords = []): array
+    {
+        $job = $task->job;
+        $c   = $job?->customer;
+
+        $customerForecast = null;
+        if ($c && $c->latitude && $c->longitude) {
+            $key      = $this->coordKey($c->latitude, $c->longitude);
+            $forecasts = $forecastsByCoords[$key] ?? [];
+            $customerForecast = array_values(array_map(
+                fn($f) => ['date' => $f['date'], 'condition' => $f['condition']],
+                $forecasts
+            ));
+        }
+
+        return [
+            'id'              => $task->id,
+            'title'           => $task->title,
+            'status'          => $task->status,
+            'weather_req'     => $task->weather_req,
+            'scheduled_date'  => $task->scheduled_date?->toDateString(),
+            'scheduled_time'  => $task->scheduled_time ? substr($task->scheduled_time, 0, 5) : null,
+            'estimated_hours' => $task->estimated_hours,
+            'customer_forecast' => $customerForecast,
+            'job' => $job ? [
+                'id'       => $job->id,
+                'title'    => $job->title,
+                'customer' => $c ? ['id' => $c->id, 'name' => $c->name] : null,
             ] : null,
         ];
     }

@@ -34,7 +34,6 @@ interface Job {
   title: string
   type: 'standard' | 'maintenance' | 'site_visit' | 'internal'
   status: 'backlog' | 'scheduled' | 'in_progress' | 'complete'
-  priority: 'normal' | 'high' | 'urgent'
   scheduled_date: string | null
   due_by: string | null
   estimated_hours: number | null
@@ -64,12 +63,6 @@ const TYPE_LABELS: Record<string, string> = {
   maintenance: 'Maintenance',
   site_visit: 'Site Visit',
   internal: 'Internal',
-}
-
-const PRIORITY_COLOURS: Record<string, string> = {
-  urgent: 'badge-urgent',
-  high:   'badge-high',
-  normal: 'badge-normal',
 }
 
 const STATUS_COLOURS: Record<string, string> = {
@@ -107,14 +100,13 @@ export default function JobList() {
   const status = searchParams.get('status') ?? ''
   const search = searchParams.get('search') ?? ''
   const page = Number(searchParams.get('page') ?? 1)
-  const sort = searchParams.get('sort') ?? 'created_at_desc'
 
   useEffect(() => {
     let cancelled = false
     setIsLoading(true)
     setLoadError(false)
 
-    const params: Record<string, string> = { page: String(page), sort }
+    const params: Record<string, string> = { page: String(page) }
     if (status) params.status = status
     if (search) params.search = search
 
@@ -124,7 +116,7 @@ export default function JobList() {
       .finally(() => { if (!cancelled) setIsLoading(false) })
 
     return () => { cancelled = true }
-  }, [status, search, page, sort])
+  }, [status, search, page])
 
   function setParam(key: string, value: string) {
     setSearchParams(prev => {
@@ -136,18 +128,23 @@ export default function JobList() {
     })
   }
 
-  function toggleSort(field: string) {
-    const asc = `${field}_asc`
-    const desc = `${field}_desc`
-    setParam('sort', sort === asc ? desc : asc)
-  }
+  const activeTotal = !status && (result?.estimated_hours_total ?? 0) > 0
+    ? formatEstimation(result!.estimated_hours_total)
+    : null
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-brand-dark">Jobs</h1>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-brand-dark">Jobs</h1>
+          {activeTotal && (
+            <p className="text-sm mt-0.5" style={{ color: 'rgba(15,55,20,0.45)' }}>
+              {activeTotal} of active work
+            </p>
+          )}
+        </div>
         <Link
           to="/jobs/new"
           className="px-4 py-2.5 rounded-lg text-sm font-bold transition-all hover:brightness-95"
@@ -171,21 +168,6 @@ export default function JobList() {
         />
       </div>
 
-      {/* Backlog total — only shown on Active tab */}
-      {!isLoading && !loadError && !status && (result?.estimated_hours_total ?? 0) > 0 && (
-        <div
-          className="mb-4 px-4 py-3 rounded-xl flex items-center justify-between"
-          style={{ background: 'rgba(151,181,69,0.12)', border: '1px solid rgba(151,181,69,0.3)' }}
-        >
-          <span className="text-sm font-semibold" style={{ color: '#0F3714' }}>
-            Active backlog
-          </span>
-          <span className="text-sm font-bold" style={{ color: '#3a6e0f' }}>
-            {formatEstimation(result!.estimated_hours_total)} of work
-          </span>
-        </div>
-      )}
-
       {/* Status tabs */}
       <div className="flex gap-1.5 mb-4 overflow-x-auto scrollbar-none pb-0.5 flex-nowrap">
         {STATUS_TABS.map(tab => (
@@ -201,19 +183,6 @@ export default function JobList() {
             {tab.label}
           </button>
         ))}
-      </div>
-
-      {/* Sort row */}
-      <div className="flex gap-3 text-xs mb-3" style={{ color: 'rgba(15,55,20,0.45)' }}>
-        <button onClick={() => toggleSort('scheduled_date')} className="hover:text-brand-dark transition-colors">
-          Date {sort.startsWith('scheduled_date') ? (sort.endsWith('asc') ? '↑' : '↓') : '↕'}
-        </button>
-        <button onClick={() => toggleSort('priority')} className="hover:text-brand-dark transition-colors">
-          Priority {sort === 'priority_desc' ? '↓' : '↕'}
-        </button>
-        <button onClick={() => setParam('sort', sort === 'due_by_asc' ? 'created_at_desc' : 'due_by_asc')} className="hover:text-brand-dark transition-colors">
-          Due By {sort === 'due_by_asc' ? '↑' : '↕'}
-        </button>
       </div>
 
       {/* Loading */}
@@ -249,7 +218,6 @@ export default function JobList() {
                   <th>Job</th>
                   <th>Type</th>
                   <th>Status</th>
-                  <th>Priority</th>
                   <th>Est.</th>
                   <th>Date</th>
                   <th>Due By</th>
@@ -272,13 +240,6 @@ export default function JobList() {
                       <span className={`badge ${STATUS_COLOURS[job.status]}`}>
                         {STATUS_LABELS[job.status]}
                       </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {job.priority !== 'normal' && (
-                        <span className={`badge ${PRIORITY_COLOURS[job.priority]}`}>
-                          {job.priority.charAt(0).toUpperCase() + job.priority.slice(1)}
-                        </span>
-                      )}
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: 'rgba(15,55,20,0.5)' }}>
                       {formatEstimation(job.estimated_hours) ?? '—'}
@@ -317,11 +278,6 @@ export default function JobList() {
                 </div>
                 <div className="flex items-center gap-2 mt-2.5 flex-wrap text-xs" style={{ color: 'rgba(15,55,20,0.45)' }}>
                   <span>{TYPE_LABELS[job.type]}</span>
-                  {job.priority !== 'normal' && (
-                    <span className={`badge ${PRIORITY_COLOURS[job.priority]}`}>
-                      {job.priority.charAt(0).toUpperCase() + job.priority.slice(1)}
-                    </span>
-                  )}
                   {job.estimated_hours != null && (
                     <span>{formatEstimation(job.estimated_hours)}</span>
                   )}

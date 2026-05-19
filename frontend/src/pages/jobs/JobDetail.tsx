@@ -68,7 +68,7 @@ interface Job {
   status: string
   weather_req: string
   estimated_hours: number | null
-  priority: string
+
   scheduled_date: string | null
   due_by: string | null
   notes: string | null
@@ -354,11 +354,6 @@ export default function JobDetail() {
       {/* Details grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         <Field label="Type">{TYPE_LABELS[job.type]}</Field>
-        <Field label="Priority">
-          <span className="font-medium" style={job.priority === 'urgent' ? { color: '#B84A2A' } : job.priority === 'high' ? { color: '#DDB01D' } : {}}>
-            {job.priority.charAt(0).toUpperCase() + job.priority.slice(1)}
-          </span>
-        </Field>
         <Field label="Weather">{WEATHER_LABELS[job.weather_req]}</Field>
         {job.estimated_hours != null && <Field label="Est. Duration">{formatEstimation(job.estimated_hours)}</Field>}
         {job.scheduled_date && job.status !== 'backlog' && (

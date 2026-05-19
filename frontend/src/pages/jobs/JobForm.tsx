@@ -17,7 +17,7 @@ interface FormState {
   status: string
   weather_req: string
   estimated_hours: string
-  priority: string
+
   scheduled_date: string
   due_by: string
   notes: string
@@ -37,7 +37,6 @@ const BLANK: FormState = {
   status: 'backlog',
   weather_req: 'any',
   estimated_hours: '',
-  priority: 'normal',
   scheduled_date: '',
   due_by: '',
   notes: '',
@@ -163,7 +162,6 @@ export default function JobForm() {
           status: j.status ?? 'backlog',
           weather_req: j.weather_req ?? 'any',
           estimated_hours: j.estimated_hours != null ? String(j.estimated_hours) : '',
-          priority: j.priority ?? 'normal',
           scheduled_date: j.scheduled_date ? j.scheduled_date.substring(0, 10) : '',
           due_by: j.due_by ? j.due_by.substring(0, 10) : '',
           notes: j.notes ?? '',
@@ -410,33 +408,19 @@ export default function JobForm() {
           />
         </div>
 
-        {/* Priority + Duration */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Priority</label>
-            <select
-              value={form.priority}
-              onChange={e => set('priority', e.target.value)}
-              className="field-input"
-            >
-              <option value="normal">Normal</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Est. Hours</label>
-            <input
-              type="number"
-              min="0"
-              max="999"
-              step="0.5"
-              placeholder="e.g. 14"
-              value={form.estimated_hours}
-              onChange={e => set('estimated_hours', e.target.value)}
-              className="field-input"
-            />
-          </div>
+        {/* Duration */}
+        <div>
+          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Est. Hours</label>
+          <input
+            type="number"
+            min="0"
+            max="999"
+            step="0.5"
+            placeholder="e.g. 14"
+            value={form.estimated_hours}
+            onChange={e => set('estimated_hours', e.target.value)}
+            className="field-input"
+          />
         </div>
 
         {/* Weather (hidden for internal) + Scheduled date */}

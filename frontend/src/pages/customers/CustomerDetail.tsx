@@ -1,9 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../../lib/api'
 import { toTitleCase, formatPhone, phoneHref, fmtDate } from '../../lib/formatters'
 import { usePermissions } from '../../hooks/usePermissions'
 import Spinner from '../../components/Spinner'
+
+interface CustomerFollowup {
+  id: number
+  note: string
+  follow_up_date: string | null
+  resolved_at: string | null
+  created_at: string
+}
 
 interface Customer {
   id: number
@@ -17,6 +25,7 @@ interface Customer {
   discount_pct: number
   default_callout_fee: number | null
   maintenance_hours_balance: number
+  followups: CustomerFollowup[]
   address: {
     address_line_1: string | null
     address_line_2: string | null
@@ -90,6 +99,16 @@ function formatDate(dateStr: string | null) {
   return fmtDate(dateStr, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function followupDateColor(dateStr: string | null): string {
+  if (!dateStr) return 'rgba(15,55,20,0.4)'
+  const d = new Date(dateStr + 'T12:00:00')
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const diff = Math.floor((d.getTime() - today.getTime()) / 86400000)
+  if (diff < 0)  return '#B84A2A'
+  if (diff <= 7) return '#DDB01D'
+  return 'rgba(15,55,20,0.4)'
+}
+
 export default function CustomerDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -98,10 +117,16 @@ export default function CustomerDetail() {
   const [isLoading, setIsLoading] = useState(true)
   const [history, setHistory] = useState<JobHistory | null>(null)
   const [historyLoading, setHistoryLoading] = useState(true)
+  const [followups, setFollowups] = useState<CustomerFollowup[]>([])
+  const [addingFollowup, setAddingFollowup] = useState(false)
+  const [newNote, setNewNote] = useState('')
+  const [newDate, setNewDate] = useState('')
+  const [followupSaving, setFollowupSaving] = useState(false)
+  const noteRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     api.get(`/customers/${id}`)
-      .then(r => setCustomer(r.data))
+      .then(r => { setCustomer(r.data); setFollowups(r.data.followups ?? []) })
       .catch(() => navigate('/customers'))
       .finally(() => setIsLoading(false))
 
@@ -120,6 +145,34 @@ export default function CustomerDetail() {
     if (!confirm(`Permanently delete ${customer?.name}? This cannot be undone — all their data will be removed.`)) return
     await api.delete(`/customers/${id}`)
     navigate('/customers')
+  }
+
+  async function handleAddFollowup() {
+    if (!newNote.trim()) return
+    setFollowupSaving(true)
+    try {
+      const res = await api.post(`/customers/${id}/followups`, {
+        note: newNote.trim(),
+        follow_up_date: newDate || null,
+      })
+      setFollowups(prev => [res.data, ...prev])
+      setNewNote('')
+      setNewDate('')
+      setAddingFollowup(false)
+    } finally {
+      setFollowupSaving(false)
+    }
+  }
+
+  async function handleResolve(followup: CustomerFollowup) {
+    const resolved_at = followup.resolved_at ? null : new Date().toISOString()
+    const res = await api.patch(`/customer-followups/${followup.id}`, { resolved_at })
+    setFollowups(prev => prev.map(f => f.id === followup.id ? res.data : f))
+  }
+
+  async function handleDeleteFollowup(followupId: number) {
+    await api.delete(`/customer-followups/${followupId}`)
+    setFollowups(prev => prev.filter(f => f.id !== followupId))
   }
 
   if (isLoading) return (
@@ -337,6 +390,115 @@ export default function CustomerDetail() {
           </div>
         )}
 
+      </div>
+
+      {/* Follow-ups */}
+      <div className="card p-5 md:p-6 mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <p className="section-label">Follow-ups</p>
+          {canEditCustomer && !addingFollowup && (
+            <button
+              onClick={() => { setAddingFollowup(true); setTimeout(() => noteRef.current?.focus(), 50) }}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
+              style={{ background: 'rgba(151,181,69,0.12)', color: '#0F3714' }}
+            >
+              + Add
+            </button>
+          )}
+        </div>
+
+        {followups.length === 0 && !addingFollowup && (
+          <p className="text-sm text-center py-3" style={{ color: 'rgba(15,55,20,0.4)' }}>
+            No follow-ups logged yet.
+          </p>
+        )}
+
+        {followups.length > 0 && (
+          <div className="flex flex-col gap-2 mb-3">
+            {followups.map(f => (
+              <div
+                key={f.id}
+                className="flex items-start gap-3 p-3 rounded-xl"
+                style={{ background: f.resolved_at ? 'rgba(0,0,0,0.03)' : 'rgba(151,181,69,0.06)', opacity: f.resolved_at ? 0.6 : 1 }}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-brand-dark" style={{ textDecoration: f.resolved_at ? 'line-through' : 'none' }}>
+                    {f.note}
+                  </p>
+                  {f.follow_up_date && (
+                    <p className="text-xs mt-1 font-medium" style={{ color: f.resolved_at ? 'rgba(15,55,20,0.4)' : followupDateColor(f.follow_up_date) }}>
+                      {f.resolved_at ? 'Resolved · ' : ''}{formatDate(f.follow_up_date)}
+                    </p>
+                  )}
+                  {f.resolved_at && !f.follow_up_date && (
+                    <p className="text-xs mt-1" style={{ color: 'rgba(15,55,20,0.4)' }}>Resolved</p>
+                  )}
+                </div>
+                {canEditCustomer && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleResolve(f)}
+                      className="text-[11px] font-semibold cursor-pointer transition-opacity hover:opacity-70"
+                      style={{ color: f.resolved_at ? '#97B545' : 'rgba(15,55,20,0.45)' }}
+                    >
+                      {f.resolved_at ? 'Undo' : 'Resolve'}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteFollowup(f.id)}
+                      className="text-[11px] font-semibold cursor-pointer transition-opacity hover:opacity-70"
+                      style={{ color: '#B84A2A' }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {addingFollowup && (
+          <div className="border-t border-black/5 pt-4 flex flex-col gap-3">
+            <textarea
+              ref={noteRef}
+              value={newNote}
+              onChange={e => setNewNote(e.target.value)}
+              placeholder="What did they mention? e.g. Wants rock splitting done in winter"
+              rows={3}
+              className="field-input resize-none text-sm"
+            />
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider block mb-1" style={{ color: 'rgba(15,55,20,0.4)' }}>
+                  Follow-up date
+                </label>
+                <input
+                  type="date"
+                  value={newDate}
+                  onChange={e => setNewDate(e.target.value)}
+                  className="field-input text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleAddFollowup}
+                disabled={followupSaving || !newNote.trim()}
+                className="px-4 py-2 text-sm font-semibold rounded-lg cursor-pointer disabled:opacity-50"
+                style={{ background: '#0F3714', color: '#97B545' }}
+              >
+                {followupSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={() => { setAddingFollowup(false); setNewNote(''); setNewDate('') }}
+                className="px-4 py-2 text-sm font-semibold rounded-lg cursor-pointer"
+                style={{ background: 'rgba(0,0,0,0.06)', color: 'rgba(15,55,20,0.6)' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Job History */}

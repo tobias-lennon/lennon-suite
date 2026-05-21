@@ -133,7 +133,23 @@ class CustomerController extends Controller
 
     public function show(Customer $customer): JsonResponse
     {
-        return response()->json($customer->load('address'));
+        $customer->load([
+            'address',
+            'followups' => fn($q) => $q->orderByRaw(
+                'resolved_at IS NOT NULL ASC, follow_up_date IS NULL ASC, follow_up_date ASC'
+            ),
+        ]);
+
+        $data = $customer->toArray();
+        $data['followups'] = $customer->followups->map(fn($f) => [
+            'id'             => $f->id,
+            'note'           => $f->note,
+            'follow_up_date' => $f->follow_up_date?->toDateString(),
+            'resolved_at'    => $f->resolved_at?->toISOString(),
+            'created_at'     => $f->created_at?->toISOString(),
+        ])->values();
+
+        return response()->json($data);
     }
 
     public function store(Request $request): JsonResponse

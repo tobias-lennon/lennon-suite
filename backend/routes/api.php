@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\CustomerFollowupController;
 use App\Http\Controllers\JobTaskController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SettingsController;
@@ -64,6 +65,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/schedule/tasks/{task}/date',       [ScheduleController::class, 'updateTaskDate']);
 
         Route::apiResource('/contacts', ContactController::class)->only(['index', 'show']);
+
+        Route::get('/customer-followups/upcoming', [CustomerFollowupController::class, 'upcoming']);
     });
 
     // Write access — field staff can log work
@@ -107,5 +110,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/settings', [SettingsController::class, 'update']);
 
         Route::apiResource('/contacts', ContactController::class)->only(['store', 'update', 'destroy']);
+
+        Route::post('/customers/{customer}/followups',      [CustomerFollowupController::class, 'store']);
+        Route::patch('/customer-followups/{followup}',      [CustomerFollowupController::class, 'update']);
+        Route::delete('/customer-followups/{followup}',     [CustomerFollowupController::class, 'destroy']);
     });
 });

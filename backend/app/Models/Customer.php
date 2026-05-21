@@ -60,4 +60,9 @@ class Customer extends Model
     {
         return $this->hasMany(LoyaltyCredit::class);
     }
+
+    public function followups(): HasMany
+    {
+        return $this->hasMany(CustomerFollowup::class);
+    }
 }

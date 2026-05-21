@@ -5,12 +5,21 @@ import api from '../lib/api'
 import Spinner from '../components/Spinner'
 import WeatherWidget from '../components/WeatherWidget'
 import { useCountUp } from '../hooks/useCountUp'
+import { fmtDate } from '../lib/formatters'
 
 interface Stats {
   total: number
   residential: number
   commercial: number
   with_email: number
+}
+
+interface UpcomingFollowup {
+  id: number
+  note: string
+  follow_up_date: string
+  customer_id: number
+  customer_name: string
 }
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
@@ -63,12 +72,17 @@ export default function Dashboard() {
   const { user } = useAuth()
   const [stats, setStats] = useState<Stats | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
+  const [followups, setFollowups] = useState<UpcomingFollowup[]>([])
 
   useEffect(() => {
     api.get('/customers/stats')
       .then(r => setStats(r.data))
       .catch(() => {})
       .finally(() => setStatsLoading(false))
+
+    api.get('/customer-followups/upcoming')
+      .then(r => setFollowups(r.data))
+      .catch(() => {})
   }, [])
 
   const hour = new Date().getHours()
@@ -144,6 +158,39 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* ── Follow-ups ─────────────────────────────────────────────── */}
+      {followups.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-bold text-brand-dark/40 uppercase tracking-widest">Follow-ups Due</h2>
+          </div>
+          <div className="rounded-2xl overflow-hidden border border-black/5" style={{ background: '#FDFAF5' }}>
+            {followups.map((f, i) => {
+              const d = new Date(f.follow_up_date + 'T12:00:00')
+              const today = new Date(); today.setHours(0, 0, 0, 0)
+              const diff = Math.floor((d.getTime() - today.getTime()) / 86400000)
+              const dateColor = diff < 0 ? '#B84A2A' : diff === 0 ? '#B84A2A' : '#DDB01D'
+              const dateLabel = diff < 0 ? `${Math.abs(diff)}d overdue` : diff === 0 ? 'Today' : fmtDate(f.follow_up_date, { day: 'numeric', month: 'short' })
+              return (
+                <Link
+                  key={f.id}
+                  to={`/customers/${f.customer_id}`}
+                  className="flex items-start gap-3 px-4 py-3 hover:bg-black/3 transition-colors"
+                  style={{ borderTop: i > 0 ? '1px solid rgba(0,0,0,0.05)' : undefined }}
+                >
+                  <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: dateColor }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-brand-dark truncate">{f.customer_name}</p>
+                    <p className="text-xs truncate mt-0.5" style={{ color: 'rgba(15,55,20,0.5)' }}>{f.note}</p>
+                  </div>
+                  <span className="text-xs font-semibold shrink-0" style={{ color: dateColor }}>{dateLabel}</span>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Quick actions ──────────────────────────────────────────── */}
       <div>

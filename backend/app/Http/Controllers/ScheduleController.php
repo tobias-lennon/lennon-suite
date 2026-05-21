@@ -90,7 +90,13 @@ class ScheduleController extends Controller
             'scheduled_date' => 'nullable|date',
         ]);
 
-        $job->update(['scheduled_date' => $data['scheduled_date']]);
+        $updates = ['scheduled_date' => $data['scheduled_date']];
+        if ($data['scheduled_date'] !== null && $job->status === 'backlog') {
+            $updates['status'] = 'scheduled';
+        } elseif ($data['scheduled_date'] === null && $job->status === 'scheduled') {
+            $updates['status'] = 'backlog';
+        }
+        $job->update($updates);
 
         $fresh = $job->fresh()->load('customer:id,name,minutes_from_hq,latitude,longitude');
         $forecastsByCoords = $this->buildForecastsMap(collect([$fresh]));
@@ -185,6 +191,7 @@ class ScheduleController extends Controller
             'weather_req'     => $task->weather_req,
             'scheduled_date'  => $task->scheduled_date?->toDateString(),
             'scheduled_time'  => $task->scheduled_time ? substr($task->scheduled_time, 0, 5) : null,
+            'due_by'          => $task->due_by?->toDateString(),
             'estimated_hours' => $task->estimated_hours,
             'customer_forecast' => $customerForecast,
             'job' => $job ? [

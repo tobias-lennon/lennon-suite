@@ -41,6 +41,8 @@ interface WorkLog {
   notes: string | null
   follow_up_note: string | null
   callout_fee: number | null
+  job_task_id: number | null
+  task: { id: number; title: string } | null
   entries: WorkLogEntry[]
   materials: Material[]
 }
@@ -67,6 +69,7 @@ interface JobTask {
   weather_req: string
   scheduled_date: string | null
   scheduled_time: string | null
+  due_by: string | null
   status: 'pending' | 'in_progress' | 'complete'
   invoice_id: number | null
   sort_order: number
@@ -138,6 +141,7 @@ export default function JobDetail() {
     weather_req: string
     scheduled_date: string
     scheduled_time: string
+    due_by: string
     notes: string
   } | null>(null)
   const [savingTask, setSavingTask] = useState(false)
@@ -205,7 +209,7 @@ export default function JobDetail() {
   }
 
   function openAddTask() {
-    setTaskForm({ id: null, title: '', estimated_hours: '', weather_req: 'any', scheduled_date: '', scheduled_time: '', notes: '' })
+    setTaskForm({ id: null, title: '', estimated_hours: '', weather_req: 'any', scheduled_date: '', scheduled_time: '', due_by: '', notes: '' })
   }
   function openEditTask(task: JobTask) {
     setTaskForm({
@@ -215,6 +219,7 @@ export default function JobDetail() {
       weather_req: task.weather_req,
       scheduled_date: task.scheduled_date ?? '',
       scheduled_time: task.scheduled_time ?? '',
+      due_by: task.due_by ?? '',
       notes: task.notes ?? '',
     })
   }
@@ -229,6 +234,7 @@ export default function JobDetail() {
       weather_req: taskForm.weather_req,
       scheduled_date: taskForm.scheduled_date || null,
       scheduled_time: taskForm.scheduled_time || null,
+      due_by: taskForm.due_by || null,
       notes: taskForm.notes || null,
     }
     try {
@@ -529,6 +535,13 @@ export default function JobDetail() {
                   {task.estimated_hours != null && (
                     <span className="text-xs" style={{ color: 'rgba(15,55,20,0.45)' }}>{formatEstimation(task.estimated_hours)}</span>
                   )}
+                  {task.due_by && task.status !== 'complete' && (() => {
+                    const today = new Date(); today.setHours(0,0,0,0)
+                    const due = new Date(task.due_by + 'T12:00:00')
+                    const diff = Math.floor((due.getTime() - today.getTime()) / 86400000)
+                    const colour = diff < 0 ? '#B84A2A' : diff <= 14 ? '#DDB01D' : 'rgba(15,55,20,0.45)'
+                    return <span className="text-xs font-medium" style={{ color: colour }}>Due {fmtDate(task.due_by, { day: 'numeric', month: 'short' })}</span>
+                  })()}
                   {task.invoice_id && (
                     <span className="text-xs px-1.5 py-0.5 rounded badge-paid">Invoiced</span>
                   )}
@@ -599,6 +612,12 @@ export default function JobDetail() {
                   <label className="block text-xs text-gray-500 mb-1">Time</label>
                   <input type="time" value={taskForm.scheduled_time}
                     onChange={e => setTaskForm(f => f && { ...f, scheduled_time: e.target.value })}
+                    className="field-input" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Due by</label>
+                  <input type="date" value={taskForm.due_by}
+                    onChange={e => setTaskForm(f => f && { ...f, due_by: e.target.value })}
                     className="field-input" />
                 </div>
               </div>
@@ -749,6 +768,11 @@ export default function JobDetail() {
                     <span className="text-xs text-gray-400">
                       {logHours.toFixed(2)}h · {fmt(logCharged)}
                     </span>
+                    {log.task && (
+                      <span className="badge" style={{ background: 'rgba(151,181,69,0.15)', color: '#0F3714' }}>
+                        {log.task.title}
+                      </span>
+                    )}
                     {(log.callout_fee ?? 0) > 0 && (
                       <span className="badge badge-scheduled">callout</span>
                     )}

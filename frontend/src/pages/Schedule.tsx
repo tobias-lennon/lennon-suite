@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import api from '../lib/api'
 import Spinner from '../components/Spinner'
@@ -28,6 +29,7 @@ interface TaskSummary {
   weather_req: string
   scheduled_date: string | null
   scheduled_time: string | null
+  due_by: string | null
   estimated_hours: number | null
   customer_forecast: CustomerForecastDay[] | null
   job: { id: number; title: string; customer: { id: number; name: string } | null } | null
@@ -127,6 +129,25 @@ function currentMonday(): string {
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00')
   return d.toLocaleDateString('en-IE', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+function formatWeekRange(startStr: string): string {
+  const start = new Date(startStr + 'T12:00:00')
+  const end   = new Date(addDays(startStr, 6) + 'T12:00:00')
+  const startDay   = start.getDate()
+  const endDay     = end.getDate()
+  const startMonth = start.toLocaleDateString('en-IE', { month: 'short' })
+  const endMonth   = end.toLocaleDateString('en-IE', { month: 'short' })
+  const year       = end.getFullYear()
+  if (startMonth === endMonth) return `${startDay}–${endDay} ${startMonth} ${year}`
+  return `${startDay} ${startMonth} – ${endDay} ${endMonth} ${year}`
+}
+
+function getISOWeek(dateStr: string): number {
+  const d = new Date(dateStr + 'T12:00:00')
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7))
+  const yearStart = new Date(d.getFullYear(), 0, 1)
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
 }
 
 function isToday(dateStr: string): boolean {
@@ -329,6 +350,13 @@ function TaskCard({ task, showAssign = false, days, assigningTaskId, onToggleAss
               ⚠ {getWarningLabel(task.weather_req ?? '', scheduledCondition, warning)}
             </div>
           )}
+          {task.due_by && task.status !== 'complete' && (() => {
+            const today = new Date(); today.setHours(0, 0, 0, 0)
+            const due = new Date(task.due_by + 'T12:00:00')
+            const diff = Math.floor((due.getTime() - today.getTime()) / 86400000)
+            const colour = diff < 0 ? '#B84A2A' : diff <= 14 ? '#DDB01D' : 'rgba(15,55,20,0.45)'
+            return <p className="text-xs font-medium mt-0.5" style={{ color: colour }}>Due {new Date(task.due_by + 'T12:00:00').toLocaleDateString('en-IE', { day: 'numeric', month: 'short' })}</p>
+          })()}
         </Link>
         {showAssign && (
           <button
@@ -378,6 +406,18 @@ export default function Schedule() {
   const [assigningTaskId, setAssigningTaskId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [needsSchedulingOpen, setNeedsSchedulingOpen] = useState(true)
+  const [fetchKey, setFetchKey] = useState(0)
+  const [dragVisual, setDragVisual] = useState<{ type: 'job' | 'task'; id: number; item: JobSummary | TaskSummary; x: number; y: number } | null>(null)
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null)
+  const [pendingDrop, setPendingDrop] = useState<{ type: 'job' | 'task'; id: number; targetDate: string } | null>(null)
+  const holdTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
+  const dragItemRef     = useRef<{ type: 'job' | 'task'; id: number; title: string; sourceDate: string | null } | null>(null)
+  const dragOverDateRef = useRef<string | null>(null)
+  const ghostRef        = useRef<HTMLDivElement>(null)
+  const scrollRAFRef    = useRef<number | null>(null)
+  const dragPointerRef  = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
 
   const fetchSchedule = useCallback((ws: string) => {
     setLoading(true); setError(false)
@@ -387,10 +427,110 @@ export default function Schedule() {
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { fetchSchedule(weekStart) }, [weekStart, fetchSchedule])
+  // fetchKey allows force-refresh even when weekStart hasn't changed (e.g. "This week" while already on current week)
+  useEffect(() => { fetchSchedule(weekStart) }, [weekStart, fetchKey, fetchSchedule])
   useEffect(() => {
     api.get('/weather').then(r => setForecasts(r.data.forecasts ?? [])).catch(() => {})
   }, [])
+
+  function updateDragTarget(x: number, y: number) {
+    const el = document.elementFromPoint(x, y)
+    let node: Element | null = el
+    while (node && !node.getAttribute('data-date')) node = node.parentElement
+    const date = node?.getAttribute('data-date') ?? null
+    dragOverDateRef.current = date
+    setDragOverDate(date)
+  }
+
+  function startHold(e: React.PointerEvent, type: 'job' | 'task', item: JobSummary | TaskSummary, sourceDate: string | null) {
+    const startX = e.clientX, startY = e.clientY
+    pointerStartRef.current = { x: startX, y: startY }
+    holdTimerRef.current = setTimeout(() => {
+      dragItemRef.current = { type, id: item.id, title: item.title, sourceDate }
+      setDragVisual({ type, id: item.id, item, x: startX, y: startY })
+      navigator.vibrate?.(40)
+      const EDGE = 80, MAX_SPEED = 15
+      const tick = () => {
+        const { x, y } = dragPointerRef.current
+        const vh = window.innerHeight
+        let speed = 0
+        if (y < EDGE) speed = -((EDGE - y) / EDGE) * MAX_SPEED
+        else if (y > vh - EDGE) speed = ((y - (vh - EDGE)) / EDGE) * MAX_SPEED
+        if (speed !== 0) { window.scrollBy(0, speed); updateDragTarget(x, y) }
+        scrollRAFRef.current = requestAnimationFrame(tick)
+      }
+      scrollRAFRef.current = requestAnimationFrame(tick)
+    }, 480)
+  }
+
+  useEffect(() => {
+    function onMove(e: PointerEvent) {
+      if (!pointerStartRef.current) return
+      const dx = e.clientX - pointerStartRef.current.x
+      const dy = e.clientY - pointerStartRef.current.y
+      if (!dragItemRef.current) {
+        if (Math.sqrt(dx * dx + dy * dy) > 8) {
+          if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null }
+          pointerStartRef.current = null
+        }
+        return
+      }
+      dragPointerRef.current = { x: e.clientX, y: e.clientY }
+      if (ghostRef.current) {
+        ghostRef.current.style.left = `${e.clientX - 20}px`
+        ghostRef.current.style.top  = `${e.clientY - 60}px`
+      }
+      updateDragTarget(e.clientX, e.clientY)
+    }
+    function onUp() {
+      if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null }
+      if (scrollRAFRef.current !== null) { cancelAnimationFrame(scrollRAFRef.current); scrollRAFRef.current = null }
+      pointerStartRef.current = null
+      const item = dragItemRef.current
+      const targetDate = dragOverDateRef.current
+      dragItemRef.current = null
+      dragOverDateRef.current = null
+      setDragVisual(null)
+      setDragOverDate(null)
+      if (item && targetDate && targetDate !== item.sourceDate) {
+        // block the click that fires immediately after pointerup so the Link doesn't navigate
+        const blockClick = (ce: MouseEvent) => { ce.preventDefault(); ce.stopPropagation(); document.removeEventListener('click', blockClick, true) }
+        document.addEventListener('click', blockClick, true)
+        setPendingDrop({ type: item.type, id: item.id, targetDate })
+      }
+    }
+    function noScroll(e: TouchEvent) { if (dragItemRef.current) e.preventDefault() }
+    function noContextMenu(e: Event) { if (holdTimerRef.current || dragItemRef.current) e.preventDefault() }
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+    document.addEventListener('pointercancel', onUp)
+    document.addEventListener('touchmove', noScroll, { passive: false })
+    document.addEventListener('contextmenu', noContextMenu)
+    return () => {
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+      document.removeEventListener('pointercancel', onUp)
+      document.removeEventListener('touchmove', noScroll)
+      document.removeEventListener('contextmenu', noContextMenu)
+      if (scrollRAFRef.current !== null) { cancelAnimationFrame(scrollRAFRef.current) }
+    }
+  }, [])
+
+  // Resolve pending drops after React has re-rendered with latest schedule state
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!pendingDrop || !schedule) return
+    const { type, id, targetDate } = pendingDrop
+    setPendingDrop(null)
+    if (type === 'job') {
+      const job = [...schedule.scheduled, ...schedule.overdue, ...schedule.unscheduled].find(j => j.id === id)
+      if (job) assignJob(job, targetDate)
+    } else {
+      const task = [...schedule.scheduled_tasks, ...schedule.overdue_tasks, ...schedule.unscheduled_tasks].find(t => t.id === id)
+      if (task) assignTask(task, targetDate)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingDrop])
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
@@ -449,13 +589,26 @@ export default function Schedule() {
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-3">
         <h1 className="text-xl font-bold text-brand-dark">Schedule</h1>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setWeekStart(w => addDays(w, -7))} className="w-8 h-8 flex items-center justify-center rounded-lg bg-black/5 hover:bg-black/10 font-bold text-brand-dark cursor-pointer">‹</button>
-          <button onClick={() => setWeekStart(currentMonday())} className="px-3 h-8 text-xs font-semibold rounded-lg bg-black/5 hover:bg-black/10 text-brand-dark cursor-pointer">This week</button>
-          <button onClick={() => setWeekStart(w => addDays(w, 7))} className="w-8 h-8 flex items-center justify-center rounded-lg bg-black/5 hover:bg-black/10 font-bold text-brand-dark cursor-pointer">›</button>
+        {weekStart !== currentMonday() && (
+          <button
+            onClick={() => { setWeekStart(currentMonday()); setFetchKey(k => k + 1) }}
+            className="px-3 h-8 text-xs font-semibold rounded-lg bg-black/5 hover:bg-black/10 text-brand-dark cursor-pointer"
+          >
+            This week
+          </button>
+        )}
+      </div>
+
+      {/* Week navigator */}
+      <div className="flex items-center justify-between mb-5">
+        <button onClick={() => setWeekStart(w => addDays(w, -7))} className="w-8 h-8 flex items-center justify-center rounded-lg bg-black/5 hover:bg-black/10 font-bold text-brand-dark cursor-pointer">‹</button>
+        <div className="flex flex-col items-center">
+          <span className="text-sm font-semibold text-brand-dark">{formatWeekRange(weekStart)}</span>
+          <span className="text-[11px]" style={{ color: 'rgba(15,55,20,0.35)' }}>Week {getISOWeek(weekStart)}</span>
         </div>
+        <button onClick={() => setWeekStart(w => addDays(w, 7))} className="w-8 h-8 flex items-center justify-center rounded-lg bg-black/5 hover:bg-black/10 font-bold text-brand-dark cursor-pointer">›</button>
       </div>
 
       {saveError && (
@@ -468,49 +621,8 @@ export default function Schedule() {
 
       {!loading && !error && (
         <>
-          {/* Unscheduled + overdue panel */}
-          {totalUnscheduled > 0 && (
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <h2 className="text-xs font-bold text-brand-dark/40 uppercase tracking-widest">Needs scheduling</h2>
-                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-black/8 text-brand-dark/50">{totalUnscheduled}</span>
-              </div>
-
-              {((schedule?.overdue.length ?? 0) > 0 || (schedule?.overdue_tasks.length ?? 0) > 0) && (
-                <div className="mb-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: '#B84A2A' }}>Overdue</p>
-                  <div className="flex flex-col gap-2">
-                    {schedule!.overdue.map(job => (
-                      <div key={job.id} className="rounded-xl border-2 border-red-100">
-                        <JobCard job={job} showAssign showSuggest {...cardProps} />
-                      </div>
-                    ))}
-                    {schedule!.overdue_tasks.map(task => (
-                      <div key={task.id} className="rounded-xl border-2 border-red-100">
-                        <TaskCard task={task} showAssign {...taskCardProps} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {((schedule?.unscheduled.length ?? 0) > 0 || (schedule?.unscheduled_tasks.length ?? 0) > 0) && (
-                <div className="flex flex-col gap-2">
-                  {schedule!.unscheduled.map(job => <JobCard key={job.id} job={job} showAssign showSuggest {...cardProps} />)}
-                  {schedule!.unscheduled_tasks.map(task => <TaskCard key={task.id} task={task} showAssign {...taskCardProps} />)}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Week days */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <h2 className="text-xs font-bold text-brand-dark/40 uppercase tracking-widest">
-                Week of {new Date(weekStart + 'T12:00:00').toLocaleDateString('en-IE', { day: 'numeric', month: 'long' })}
-              </h2>
-            </div>
-
+          {/* Week calendar */}
+          <div className="mb-6">
             <div className="flex flex-col gap-3">
               {days.map(date => {
                 const jobs = schedule?.scheduled.filter(j => j.scheduled_date === date) ?? []
@@ -522,25 +634,28 @@ export default function Schedule() {
                 return (
                   <div
                     key={date}
+                    data-date={date}
                     className="rounded-2xl border overflow-hidden"
-                    style={{ borderColor: today ? '#97B545' : 'rgba(0,0,0,0.08)' }}
+                    style={{
+                      borderColor: dragOverDate === date || today ? '#97B545' : 'rgba(0,0,0,0.08)',
+                      boxShadow: dragOverDate === date ? '0 0 0 3px rgba(151,181,69,0.25)' : undefined,
+                      transition: 'box-shadow 0.15s ease, border-color 0.15s ease',
+                    }}
                   >
                     {/* Day header */}
                     <div
                       className="flex items-center justify-between px-4 py-3"
                       style={{ background: today ? '#0F3714' : past ? 'rgba(0,0,0,0.02)' : 'rgba(151,181,69,0.06)' }}
                     >
-                      <div className="flex items-center gap-3">
-                        <div>
-                          <p className="text-sm font-bold" style={{ color: today ? '#97B545' : past ? '#aaa' : '#0F3714' }}>
-                            {formatDate(date)}
+                      <div>
+                        <p className="text-sm font-bold" style={{ color: today ? '#97B545' : past ? '#aaa' : '#0F3714' }}>
+                          {formatDate(date)}
+                        </p>
+                        {(jobs.length > 0 || tasks.length > 0) && (
+                          <p className="text-[11px]" style={{ color: today ? 'rgba(255,255,255,0.5)' : '#999' }}>
+                            {[jobs.length > 0 && `${jobs.length} job${jobs.length !== 1 ? 's' : ''}`, tasks.length > 0 && `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
                           </p>
-                          {(jobs.length > 0 || tasks.length > 0) && (
-                            <p className="text-[11px]" style={{ color: today ? 'rgba(255,255,255,0.5)' : '#999' }}>
-                              {[jobs.length > 0 && `${jobs.length} job${jobs.length !== 1 ? 's' : ''}`, tasks.length > 0 && `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
-                            </p>
-                          )}
-                        </div>
+                        )}
                       </div>
                       {forecast && (
                         <div className="text-right">
@@ -556,8 +671,11 @@ export default function Schedule() {
                     {(jobs.length > 0 || tasks.length > 0) ? (
                       <div className="p-3 flex flex-col gap-2">
                         {jobs.map(job => (
-                          <div key={job.id} className="flex items-center gap-2">
-                            <div className="flex-1"><JobCard job={job} {...cardProps} /></div>
+                          <div key={job.id} className="flex items-center gap-2"
+                            style={{ opacity: dragVisual?.type === 'job' && dragVisual.id === job.id ? 0.3 : 1, transition: 'opacity 0.2s' }}>
+                            <div className="flex-1" onPointerDown={e => startHold(e, 'job', job, date)} onContextMenu={e => e.preventDefault()} style={{ touchAction: dragVisual ? 'none' : 'pan-y' }}>
+                              <JobCard job={job} {...cardProps} />
+                            </div>
                             <button onClick={() => assignJob(job, null)}
                               className="flex-shrink-0 text-xs text-gray-400 hover:text-red-400 transition-colors cursor-pointer px-1"
                               title="Unschedule">×</button>
@@ -567,8 +685,11 @@ export default function Schedule() {
                           <p className="text-[10px] font-bold uppercase tracking-wider mt-1 mb-0.5" style={{ color: 'rgba(15,55,20,0.35)' }}>Tasks</p>
                         )}
                         {tasks.map(task => (
-                          <div key={task.id} className="flex items-center gap-2">
-                            <div className="flex-1"><TaskCard task={task} {...taskCardProps} /></div>
+                          <div key={task.id} className="flex items-center gap-2"
+                            style={{ opacity: dragVisual?.type === 'task' && dragVisual.id === task.id ? 0.3 : 1, transition: 'opacity 0.2s' }}>
+                            <div className="flex-1" onPointerDown={e => startHold(e, 'task', task, date)} onContextMenu={e => e.preventDefault()} style={{ touchAction: dragVisual ? 'none' : 'pan-y' }}>
+                              <TaskCard task={task} {...taskCardProps} />
+                            </div>
                             <button onClick={() => assignTask(task, null)}
                               className="flex-shrink-0 text-xs text-gray-400 hover:text-red-400 transition-colors cursor-pointer px-1"
                               title="Unschedule">×</button>
@@ -584,6 +705,70 @@ export default function Schedule() {
             </div>
           </div>
 
+          {/* Needs scheduling — collapsible */}
+          {totalUnscheduled > 0 && (
+            <div>
+              <button
+                onClick={() => setNeedsSchedulingOpen(v => !v)}
+                className="flex items-center gap-2 mb-3 w-full text-left"
+              >
+                <h2 className="text-xs font-bold text-brand-dark/40 uppercase tracking-widest">Needs scheduling</h2>
+                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-black/8 text-brand-dark/50">{totalUnscheduled}</span>
+                <span className="ml-auto text-xs" style={{ color: 'rgba(15,55,20,0.3)' }}>{needsSchedulingOpen ? '▲' : '▼'}</span>
+              </button>
+
+              <div style={{
+                maxHeight: needsSchedulingOpen ? '3000px' : '0',
+                overflow: 'hidden',
+                opacity: needsSchedulingOpen ? 1 : 0,
+                transition: 'max-height 0.4s ease, opacity 0.3s ease',
+              }}>
+                {((schedule?.overdue.length ?? 0) > 0 || (schedule?.overdue_tasks.length ?? 0) > 0) && (
+                  <div className="mb-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: '#B84A2A' }}>Overdue</p>
+                    <div className="flex flex-col gap-2">
+                      {schedule!.overdue.map(job => (
+                        <div key={job.id} className="rounded-xl border-2 border-red-100"
+                          onPointerDown={e => startHold(e, 'job', job, null)}
+                          onContextMenu={e => e.preventDefault()}
+                          style={{ opacity: dragVisual?.type === 'job' && dragVisual.id === job.id ? 0.3 : 1, touchAction: dragVisual ? 'none' : 'pan-y', transition: 'opacity 0.2s' }}>
+                          <JobCard job={job} showAssign showSuggest {...cardProps} />
+                        </div>
+                      ))}
+                      {schedule!.overdue_tasks.map(task => (
+                        <div key={task.id} className="rounded-xl border-2 border-red-100"
+                          onPointerDown={e => startHold(e, 'task', task, null)}
+                          onContextMenu={e => e.preventDefault()}
+                          style={{ opacity: dragVisual?.type === 'task' && dragVisual.id === task.id ? 0.3 : 1, touchAction: dragVisual ? 'none' : 'pan-y', transition: 'opacity 0.2s' }}>
+                          <TaskCard task={task} showAssign {...taskCardProps} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {((schedule?.unscheduled.length ?? 0) > 0 || (schedule?.unscheduled_tasks.length ?? 0) > 0) && (
+                  <div className="flex flex-col gap-2">
+                    {schedule!.unscheduled.map(job => (
+                      <div key={job.id}
+                        onPointerDown={e => startHold(e, 'job', job, null)}
+                        style={{ opacity: dragVisual?.type === 'job' && dragVisual.id === job.id ? 0.3 : 1, touchAction: dragVisual ? 'none' : 'pan-y', transition: 'opacity 0.2s' }}>
+                        <JobCard job={job} showAssign showSuggest {...cardProps} />
+                      </div>
+                    ))}
+                    {schedule!.unscheduled_tasks.map(task => (
+                      <div key={task.id}
+                        onPointerDown={e => startHold(e, 'task', task, null)}
+                        style={{ opacity: dragVisual?.type === 'task' && dragVisual.id === task.id ? 0.3 : 1, touchAction: dragVisual ? 'none' : 'pan-y', transition: 'opacity 0.2s' }}>
+                        <TaskCard task={task} showAssign {...taskCardProps} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {totalUnscheduled === 0 && schedule?.scheduled.length === 0 && schedule?.scheduled_tasks.length === 0 && (
             <div className="text-center py-10">
               <p className="text-sm text-gray-400">No jobs to schedule.</p>
@@ -591,6 +776,44 @@ export default function Schedule() {
             </div>
           )}
         </>
+      )}
+
+      {/* Drag ghost — portalled to body to escape page-enter transform stacking context */}
+      {dragVisual && createPortal(
+        <div
+          ref={ghostRef}
+          className="fixed z-[9999] pointer-events-none"
+          style={{
+            left:      dragVisual.x - 20,
+            top:       dragVisual.y - 60,
+            width:     280,
+            transform: 'rotate(2deg) scale(0.97)',
+            opacity:   0.93,
+            filter:    'drop-shadow(0 10px 28px rgba(0,0,0,0.22))',
+          }}
+        >
+          {dragVisual.type === 'job'
+            ? <JobCard
+                job={dragVisual.item as JobSummary}
+                days={days}
+                assigningJobId={null}
+                onToggleAssign={() => {}}
+                saving={false}
+                onAssign={() => {}}
+                forecasts={forecasts}
+              />
+            : <TaskCard
+                task={dragVisual.item as TaskSummary}
+                days={days}
+                assigningTaskId={null}
+                onToggleAssign={() => {}}
+                saving={false}
+                onAssign={() => {}}
+                forecasts={forecasts}
+              />
+          }
+        </div>,
+        document.body
       )}
     </div>
   )

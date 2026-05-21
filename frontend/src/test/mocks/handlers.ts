@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import { mockEmployees, mockJob, mockCustomers, mockWorkLog, mockLead, mockCustomerDetail, mockCustomerHistory, mockInvoice, mockUser } from './data'
+import { mockEmployees, mockJob, mockCustomers, mockWorkLog, mockLead, mockCustomerDetail, mockCustomerHistory, mockInvoice, mockUser, mockSchedule, mockScheduledJob, mockUnscheduledJob } from './data'
 
 export const handlers = [
 
@@ -153,6 +153,30 @@ export const handlers = [
   http.post('/api/leads/:id/convert', () =>
     HttpResponse.json({ customer: mockCustomerDetail })
   ),
+
+  // ── Schedule ──────────────────────────────────────────────────────────────
+  http.get('/api/schedule', () => HttpResponse.json(mockSchedule)),
+
+  http.patch('/api/schedule/jobs/:id/date', async ({ request, params }) => {
+    const body = await request.json() as { scheduled_date: string | null }
+    const id = Number(params.id)
+    const base = id === mockScheduledJob.id ? mockScheduledJob : mockUnscheduledJob
+    const newStatus = body.scheduled_date !== null && base.status === 'backlog'
+      ? 'scheduled'
+      : body.scheduled_date === null && base.status === 'scheduled'
+        ? 'backlog'
+        : base.status
+    return HttpResponse.json({ ...base, scheduled_date: body.scheduled_date, status: newStatus })
+  }),
+
+  http.patch('/api/schedule/tasks/:id/date', async ({ request }) => {
+    const body = await request.json() as { scheduled_date: string | null }
+    return HttpResponse.json({ id: 1, title: 'Mock Task', status: 'pending', weather_req: 'any',
+      scheduled_date: body.scheduled_date, scheduled_time: null, due_by: null,
+      estimated_hours: null, customer_forecast: null, job: null })
+  }),
+
+  http.get('/api/weather', () => HttpResponse.json({ forecasts: [] })),
 
   // ── Rate cards ────────────────────────────────────────────────────────
   http.get('/api/rate-cards', () => HttpResponse.json([

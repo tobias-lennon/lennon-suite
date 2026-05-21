@@ -85,9 +85,14 @@ function dueBadge(dueBy: string | null, status: string) {
   const due = new Date(dueBy.substring(0, 10) + 'T12:00:00')
   const diff = Math.floor((due.getTime() - today.getTime()) / 86400000)
   if (diff < 0) return <span style={{ color: '#B84A2A', fontWeight: 600 }} className="text-xs">Due {due.toLocaleDateString('en-IE')} · Overdue</span>
-  const countdown = diff === 0 ? 'Today' : diff < 14 ? `${diff}d` : `${Math.round(diff / 7)}w`
+  let countdown: string
+  if (diff === 0) countdown = 'Today'
+  else if (diff < 14) countdown = `${diff}d`
+  else if (diff < 70) countdown = `${Math.round(diff / 7)}w`
+  else if (diff < 548) countdown = `${Math.round(diff / 30)}mo`
+  else countdown = ''
   const color = diff === 0 ? '#B84A2A' : diff <= 7 ? '#DDB01D' : 'rgba(15,55,20,0.5)'
-  return <span style={{ color, fontWeight: diff <= 7 ? 600 : 400 }} className="text-xs">Due {due.toLocaleDateString('en-IE')} · {countdown}</span>
+  return <span style={{ color, fontWeight: diff <= 7 ? 600 : 400 }} className="text-xs">Due {due.toLocaleDateString('en-IE')}{countdown ? ` · ${countdown}` : ''}</span>
 }
 
 export default function JobList() {

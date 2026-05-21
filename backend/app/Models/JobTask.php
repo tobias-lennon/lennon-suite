@@ -17,6 +17,7 @@ class JobTask extends Model
         'weather_req',
         'scheduled_date',
         'scheduled_time',
+        'due_by',
         'status',
         'invoice_id',
         'sort_order',
@@ -27,6 +28,7 @@ class JobTask extends Model
     {
         return [
             'scheduled_date'  => 'date',
+            'due_by'          => 'date',
             'estimated_hours' => 'float',
             'sort_order'      => 'integer',
         ];

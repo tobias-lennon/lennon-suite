@@ -8,6 +8,12 @@ interface Employee {
   name: string
 }
 
+interface JobTask {
+  id: number
+  title: string
+  status: string
+}
+
 interface EntryRow {
   id?: number          // present in edit mode
   employee_id: string
@@ -168,6 +174,8 @@ export default function WorkLogForm() {
   })
   const [materials, setMaterials] = useState<MaterialRow[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [jobTasks, setJobTasks] = useState<JobTask[]>([])
+  const [taskId, setTaskId] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSaving, setIsSaving] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -185,6 +193,7 @@ export default function WorkLogForm() {
         setJobComplete(true)
       }
       setJobType(jobData.type ?? '')
+      setJobTasks(jobData.tasks ?? [])
       setEmployees(empRes.data)
 
       // For new logs, surface the previous log's follow-up note as a banner
@@ -203,6 +212,7 @@ export default function WorkLogForm() {
         setNotes(log.notes ?? '')
         setFollowUpNote(log.follow_up_note ?? '')
         setHasWasteDisposal(!!log.has_waste_disposal)
+        setTaskId(log.job_task_id ? String(log.job_task_id) : '')
         setMaterials(
           (log.materials ?? []).map((m: {
             id: number
@@ -340,6 +350,7 @@ export default function WorkLogForm() {
           notes: notes || null,
           follow_up_note: followUpNote || null,
           has_waste_disposal: hasWasteDisposal,
+          job_task_id: taskId ? Number(taskId) : null,
         })
         // Update each time entry
         for (const entry of entries) {
@@ -383,6 +394,7 @@ export default function WorkLogForm() {
           notes: notes || null,
           follow_up_note: followUpNote || null,
           has_waste_disposal: hasWasteDisposal,
+          job_task_id: taskId ? Number(taskId) : null,
           entries: entries.map(e => ({
             employee_id: Number(e.employee_id),
             start_time: e.start_time || null,
@@ -462,6 +474,26 @@ export default function WorkLogForm() {
           />
           {errors.date && <p className="text-xs mt-1 text-danger">{errors.date}</p>}
         </div>
+
+        {/* Task selector — only shown when the job has tasks */}
+        {jobTasks.length > 0 && (
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'rgba(15,55,20,0.45)' }}>Task (optional)</label>
+            <select
+              value={taskId}
+              onChange={e => setTaskId(e.target.value)}
+              className="field-input"
+            >
+              <option value="">— General / no specific task —</option>
+              {jobTasks.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.title}{t.status === 'complete' ? ' (complete)' : ''}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs mt-1" style={{ color: 'rgba(15,55,20,0.35)' }}>Link this work log to a specific task for billing.</p>
+          </div>
+        )}
 
         {/* Day-level flags */}
         {jobType !== 'internal' && (

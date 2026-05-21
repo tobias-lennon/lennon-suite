@@ -111,6 +111,43 @@ export const mockCustomerHistory = {
   jobs: [],
 }
 
+export const mockUnscheduledJob = {
+  id: 10,
+  title: 'Hedge Trim - Murphy',
+  type: 'standard',
+  status: 'backlog',
+  scheduled_date: null,
+  due_by: null,
+  priority: 'normal',
+  weather_req: 'any',
+  customer_forecast: null,
+  customer: { id: 1, name: 'John Murphy', minutes_from_hq: 10 },
+}
+
+export const mockScheduledJob = {
+  id: 11,
+  title: "Lawn Care - O'Brien",
+  type: 'standard',
+  status: 'scheduled',
+  scheduled_date: '2026-06-03',
+  due_by: null,
+  priority: 'normal',
+  weather_req: 'any',
+  customer_forecast: null,
+  customer: { id: 2, name: "Mary O'Brien", minutes_from_hq: 5 },
+}
+
+export const mockSchedule = {
+  week_start: '2026-06-02',
+  week_end:   '2026-06-08',
+  scheduled:         [mockScheduledJob],
+  overdue:           [],
+  unscheduled:       [mockUnscheduledJob],
+  scheduled_tasks:   [],
+  overdue_tasks:     [],
+  unscheduled_tasks: [],
+}
+
 export const mockInvoice = {
   id: 1,
   invoice_number: 'LL-2026-100',

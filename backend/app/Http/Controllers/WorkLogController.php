@@ -33,6 +33,7 @@ class WorkLogController extends Controller
             'follow_up_note'                => 'nullable|string|max:1000',
             'callout_fee'                   => 'nullable|numeric|min:0',
             'has_waste_disposal'            => 'boolean',
+            'job_task_id'                   => 'nullable|exists:job_tasks,id',
             'entries'                       => 'array',
             'entries.*.employee_id'         => 'required|exists:employees,id',
             'entries.*.start_time'          => 'nullable|date_format:H:i',
@@ -55,6 +56,7 @@ class WorkLogController extends Controller
             'follow_up_note'     => $data['follow_up_note'] ?? null,
             'callout_fee'        => $data['callout_fee'] ?? null,
             'has_waste_disposal' => $data['has_waste_disposal'] ?? false,
+            'job_task_id'        => $data['job_task_id'] ?? null,
         ]);
 
         $isInternal       = $job->type === 'internal';
@@ -136,6 +138,7 @@ class WorkLogController extends Controller
             'follow_up_note'     => 'nullable|string|max:1000',
             'callout_fee'        => 'nullable|numeric|min:0',
             'has_waste_disposal' => 'boolean',
+            'job_task_id'        => 'nullable|exists:job_tasks,id',
         ]);
 
         $log->update($data);

@@ -40,12 +40,20 @@ class JobController extends Controller
             });
         }
 
-        $sort = $request->get('sort', 'scheduled_date_asc');
+        $sort = $request->get('sort', 'smart');
         match ($sort) {
             'scheduled_date_asc'  => $query->orderByRaw('scheduled_date IS NULL, scheduled_date ASC'),
             'scheduled_date_desc' => $query->orderByRaw('scheduled_date IS NULL, scheduled_date DESC'),
             'due_by_asc'          => $query->orderByRaw('due_by IS NULL, due_by ASC'),
-            default               => $query->orderByRaw('scheduled_date IS NULL, scheduled_date ASC'),
+            default               => $query->orderByRaw("
+                CASE status WHEN 'in_progress' THEN 0 WHEN 'scheduled' THEN 1 WHEN 'backlog' THEN 2 ELSE 3 END ASC,
+                CASE WHEN status IN ('in_progress', 'scheduled') THEN scheduled_date END ASC,
+                CASE WHEN status = 'backlog' AND due_by IS NULL THEN 1 ELSE 0 END ASC,
+                CASE WHEN status = 'backlog' THEN due_by END ASC,
+                CASE WHEN status = 'backlog' THEN
+                    CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END
+                END ASC
+            "),
         };
 
         $paginated = $query->paginate(25);
@@ -113,6 +121,7 @@ class JobController extends Controller
             'workLogs' => fn($q) => $q->orderBy('date', 'desc'),
             'workLogs.entries.employee:id,name',
             'workLogs.materials',
+            'workLogs.task:id,title',
         ]);
 
         $job->append([]);
@@ -132,6 +141,7 @@ class JobController extends Controller
             'weather_req'     => $t->weather_req,
             'scheduled_date'  => $t->scheduled_date?->toDateString(),
             'scheduled_time'  => $t->scheduled_time ? substr($t->scheduled_time, 0, 5) : null,
+            'due_by'          => $t->due_by?->toDateString(),
             'status'          => $t->status,
             'invoice_id'      => $t->invoice_id,
             'sort_order'      => $t->sort_order,

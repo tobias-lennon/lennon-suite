@@ -17,6 +17,7 @@ class JobTaskController extends Controller
             'weather_req'     => 'in:any,light_rain_ok,dry_preferred,dry_only,frost_free',
             'scheduled_date'  => 'nullable|date',
             'scheduled_time'  => 'nullable|date_format:H:i',
+            'due_by'          => 'nullable|date',
             'status'          => 'in:pending,in_progress,complete',
             'notes'           => 'nullable|string|max:2000',
         ]);
@@ -39,6 +40,7 @@ class JobTaskController extends Controller
             'weather_req'     => 'sometimes|in:any,light_rain_ok,dry_preferred,dry_only,frost_free',
             'scheduled_date'  => 'nullable|date',
             'scheduled_time'  => 'nullable|date_format:H:i',
+            'due_by'          => 'nullable|date',
             'status'          => 'sometimes|in:pending,in_progress,complete',
             'sort_order'      => 'sometimes|integer|min:0',
             'notes'           => 'nullable|string|max:2000',
@@ -67,6 +69,7 @@ class JobTaskController extends Controller
             'weather_req'     => $task->weather_req,
             'scheduled_date'  => $task->scheduled_date?->toDateString(),
             'scheduled_time'  => $task->scheduled_time ? substr($task->scheduled_time, 0, 5) : null,
+            'due_by'          => $task->due_by?->toDateString(),
             'status'          => $task->status,
             'invoice_id'      => $task->invoice_id,
             'sort_order'      => $task->sort_order,

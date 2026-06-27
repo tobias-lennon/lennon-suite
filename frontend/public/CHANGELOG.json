@@ -1,0 +1,131 @@
+{
+  "versions": [
+    {
+      "version": "1.9.15",
+      "date": "2026-06-19",
+      "changes": [
+        "Loyalty credits can now be applied to maintenance invoices — apply a free visit directly from the invoice detail page",
+        "Invoice detail page shows a loyalty panel with hours earned, running balance, and a progress bar",
+        "Invoice PDF shows a Loyalty Reward line in the totals block when a credit has been applied, and adapts the loyalty note to reflect whether the visit was redeemed, banked, or still being built up",
+        "Settings → Business Targets: loyalty credit value (ex. VAT) is now configurable"
+      ]
+    },
+    {
+      "version": "1.9.14",
+      "date": "2026-06-19",
+      "changes": [
+        "Fixed: invoice PDF download was failing and leaving the button stuck — now recovers cleanly if anything goes wrong",
+        "Fixed: labour rows on invoice PDF now show the correct visit date"
+      ]
+    },
+    {
+      "version": "1.9.13",
+      "date": "2026-06-19",
+      "changes": [
+        "Settings → App: new 'What's New' button to review recent patch notes any time"
+      ]
+    },
+    {
+      "version": "1.9.12",
+      "date": "2026-06-19",
+      "changes": [
+        "Fixed: invoice visit order — visits on multi-visit invoices now always appear in date order",
+        "Fixed: employee can now be changed when editing a work log entry",
+        "Fixed: duplicate date field no longer appears when creating a scheduled job",
+        "Fixed: loyalty points now correctly adjust when editing or deleting work log entries",
+        "Fixed: deleting a work log now reverses the loyalty hours that were credited for it",
+        "Fixed: customers on exempt rate cards no longer see a loyalty section on their invoice",
+        "Invoice PDF: labour lines now show the visit date only — employee names are internal"
+      ]
+    },
+    {
+      "version": "1.9.11",
+      "date": "2026-05-28",
+      "changes": [
+        "Loyalty points toggle added to customer form — on by default, turn it off for customers who shouldn't earn points. Affects both point accumulation and the loyalty section on their invoices"
+      ]
+    },
+    {
+      "version": "1.9.10",
+      "date": "2026-05-28",
+      "changes": [
+        "Removed misleading 'discount applied to rates' note from job totals"
+      ]
+    },
+    {
+      "version": "1.9.9",
+      "date": "2026-05-28",
+      "changes": [
+        "Fixed: standing discount was being applied twice — once to the hourly rate, then again to the invoice subtotal. It now only applies to the subtotal, so line-item rates show the true rate and the discount is a clean deduction",
+        "Fixed: custom hourly rate set on a customer is now actually used when logging hours (was being ignored)"
+      ]
+    },
+    {
+      "version": "1.9.8",
+      "date": "2026-05-28",
+      "changes": [
+        "Fixed: county dropdown showing blank when editing a customer — was caused by a case mismatch between stored value and the dropdown list",
+        "Fixed: county validation errors now show inline on the field and scroll to it, rather than appearing as a generic message at the bottom"
+      ]
+    },
+    {
+      "version": "1.9.7",
+      "date": "2026-05-28",
+      "changes": [
+        "Settings menu now animates closed (was snapping shut instantly)",
+        "Patch notes backfilled for v1.9.3 through v1.9.6 — you may see a catch-up summary"
+      ]
+    },
+    {
+      "version": "1.9.6",
+      "date": "2026-05-28",
+      "changes": [
+        "VAT Calculator added — accessible from the sidebar (desktop) and avatar menu (mobile)",
+        "Settings menu now closes when tapping a bottom nav tab",
+        "Removed redundant 'ex-VAT' labels — VAT is always added on top unless stated"
+      ]
+    },
+    {
+      "version": "1.9.5",
+      "date": "2026-05-28",
+      "changes": [
+        "Fixed currency fields not formatting on blur when pasting values like 37.3507"
+      ]
+    },
+    {
+      "version": "1.9.4",
+      "date": "2026-05-28",
+      "changes": [
+        "Currency fields now round to 2 decimal places on blur across the whole app",
+        "Invoice and receipt PDF filenames updated to INV-LL-… and REC-LL-… format"
+      ]
+    },
+    {
+      "version": "1.9.3",
+      "date": "2026-05-28",
+      "changes": [
+        "Custom hourly rate per customer — set a fixed rate that overrides the standard, shown as a pill on the customer page"
+      ]
+    },
+    {
+      "version": "1.9.2",
+      "date": "2026-05-26",
+      "changes": [
+        "Payroll moved into Office section — no longer a separate nav item",
+        "Office cards redesigned: compact horizontal layout with number beside icon",
+        "Office order: Payroll, Invoices, Leads, Contacts"
+      ]
+    },
+    {
+      "version": "1.9.1",
+      "date": "2026-05-26",
+      "changes": [
+        "Employee management: add and edit employees with pay rates and PPSN",
+        "My Hours: field staff can now view their logged work history",
+        "App updates and version info moved to Settings → App tab",
+        "Rate cards: maintenance rate now shown as its own card",
+        "Patch notes: you'll see what changed after every update"
+      ]
+    }
+  ]
+}

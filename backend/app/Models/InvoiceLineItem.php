@@ -12,6 +12,7 @@ class InvoiceLineItem extends Model
         'type',
         'description',
         'quantity',
+        'unit',
         'unit_price',
         'amount',
     ];

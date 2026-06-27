@@ -27,6 +27,11 @@ class RateCalculationService
 
     public function calculateRate(FieldJob $job, Customer $customer, bool $hasPowerTools = false, bool $hasWasteDisposal = false): float
     {
+        // Custom rate overrides the rate card entirely — no uplifts or discounts on top
+        if (!empty($customer->custom_rate) && $customer->custom_rate > 0) {
+            return round((float) $customer->custom_rate, 2);
+        }
+
         $card = $this->resolveRateCard($customer);
 
         if ($job->type === 'maintenance') {
@@ -41,11 +46,8 @@ class RateCalculationService
             }
         }
 
-        $discount = $customer->discount_pct ?? 0;
-        if ($discount > 0) {
-            $rate = $rate * (1 - $discount / 100);
-        }
-
+        // Discount is NOT applied here — the invoice applies it to the subtotal,
+        // keeping line-item rates clean and avoiding double-discounting.
         return round($rate, 2);
     }
 
@@ -80,6 +82,10 @@ class RateCalculationService
 
     public function checkMaintenanceLoyalty(Customer $customer, float $hoursAdded): void
     {
+        if ($customer->skip_loyalty) {
+            return;
+        }
+
         $card = $this->resolveRateCard($customer);
         if ($card->skip_loyalty) {
             return;
@@ -100,6 +106,24 @@ class RateCalculationService
             $customer->maintenance_hours_balance -= $threshold;
         }
 
+        $customer->save();
+    }
+
+    public function reverseMaintenanceLoyalty(Customer $customer, float $hoursToRemove): void
+    {
+        if ($customer->skip_loyalty) {
+            return;
+        }
+
+        $card = $this->resolveRateCard($customer);
+        if ($card->skip_loyalty) {
+            return;
+        }
+
+        $customer->maintenance_hours_balance = max(
+            0,
+            round($customer->maintenance_hours_balance - $hoursToRemove, 2)
+        );
         $customer->save();
     }
 }

@@ -423,7 +423,21 @@ export default function JobForm() {
           />
         </div>
 
-        {/* Weather (hidden for internal) + Scheduled date */}
+        {/* Scheduled date — only visible when status is scheduled */}
+        {form.status === 'scheduled' && (
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Scheduled Date</label>
+            <input
+              type="date"
+              value={form.scheduled_date}
+              onChange={e => set('scheduled_date', e.target.value)}
+              className={`field-input${errors.scheduled_date ? ' field-error' : ''}`}
+            />
+            {errors.scheduled_date && <p className="text-xs mt-1 text-danger">{errors.scheduled_date}</p>}
+          </div>
+        )}
+
+        {/* Weather (hidden for internal) + Due By */}
         <div className="grid grid-cols-2 gap-4">
           {!isInternal && (
             <div>
@@ -437,18 +451,6 @@ export default function JobForm() {
                 <option value="dry_preferred">Dry preferred</option>
                 <option value="dry_only">Dry only</option>
               </select>
-            </div>
-          )}
-          {form.status === 'scheduled' && (
-            <div className={isInternal ? 'col-span-2' : ''}>
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Scheduled Date</label>
-              <input
-                type="date"
-                value={form.scheduled_date}
-                onChange={e => set('scheduled_date', e.target.value)}
-                className={`field-input${errors.scheduled_date ? ' field-error' : ''}`}
-              />
-              {errors.scheduled_date && <p className="text-xs mt-1 text-danger">{errors.scheduled_date}</p>}
             </div>
           )}
           {form.status !== 'complete' && (
@@ -479,16 +481,17 @@ export default function JobForm() {
         {!isInternal && (
           <div>
             <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-              Callout fee default (ex-VAT)
+              Callout fee default
             </label>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-500">€</span>
               <input
                 type="number"
-                step="0.01"
+                step="any"
                 min="0"
                 value={form.callout_fee}
                 onChange={e => set('callout_fee', e.target.value)}
+                onBlur={e => { const v = e.target.valueAsNumber; if (!isNaN(v)) set('callout_fee', v.toFixed(2)) }}
                 placeholder="0.00"
                 className="w-36 field-input"
               />

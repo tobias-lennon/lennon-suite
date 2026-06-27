@@ -662,11 +662,6 @@ export default function JobDetail() {
           {job.type === 'internal' && (
             <p className="text-xs text-gray-400 mt-2 italic">Internal work — hours logged only, no billing.</p>
           )}
-          {job.customer?.discount_pct > 0 && (
-            <p className="text-xs text-gray-400 mt-2">
-              {job.customer.discount_pct}% discount applied to this customer's rates.
-            </p>
-          )}
         </div>
       )}
 

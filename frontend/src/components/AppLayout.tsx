@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useAuth } from '../contexts/AuthContext'
 import Avatar from './Avatar'
 import Logo from './Logo'
+import VatCalc from './VatCalc'
 
 const allNavItems = [
   { to: '/dashboard', label: 'Home', roles: ['admin', 'field', 'customer'], icon: (
@@ -10,9 +11,9 @@ const allNavItems = [
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
     </svg>
   )},
-  { to: '/customers', label: 'Clients', roles: ['admin', 'field'], icon: (
+  { to: '/schedule', label: 'Schedule', roles: ['admin', 'field'], icon: (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
     </svg>
   )},
   { to: '/jobs', label: 'Jobs', roles: ['admin', 'field'], icon: (
@@ -20,9 +21,19 @@ const allNavItems = [
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
     </svg>
   )},
-  { to: '/schedule', label: 'Schedule', roles: ['admin', 'field'], icon: (
+  { to: '/my-hours', label: 'My Hours', roles: ['field'], icon: (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  )},
+  { to: '/my-payslips', label: 'My Payslips', roles: ['field'], icon: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  )},
+  { to: '/customers', label: 'Clients', roles: ['admin'], icon: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
   )},
   { to: '/office', label: 'Office', roles: ['admin'], icon: (
@@ -32,13 +43,14 @@ const allNavItems = [
   )},
 ]
 
-const OFFICE_CHILD_PATHS = ['/invoices', '/leads', '/contacts']
+const OFFICE_CHILD_PATHS = ['/invoices', '/leads', '/contacts', '/payroll']
 
 export default function AppLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuOpen, setMenuOpen]       = useState(false)
+  const [vatCalcOpen, setVatCalcOpen] = useState(false)
   const role = user?.role ?? 'field'
   const navItems = allNavItems.filter(item => item.roles.includes(role))
 
@@ -82,8 +94,8 @@ export default function AppLayout() {
           ))}
         </nav>
 
-        {/* Settings */}
-        <div className="px-3 pb-2">
+        {/* Settings + VAT Calc — admin only */}
+        {role === 'admin' && <div className="px-3 pb-2 flex flex-col gap-0.5">
           <NavLink
             to="/settings"
             className={({ isActive }) =>
@@ -100,7 +112,16 @@ export default function AppLayout() {
             </svg>
             Settings
           </NavLink>
-        </div>
+          <button
+            onClick={() => setVatCalcOpen(true)}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-white/55 hover:text-white hover:bg-white/8 cursor-pointer w-full"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            VAT Calculator
+          </button>
+        </div>}
 
         {/* User section */}
         <div className="p-4 mt-2">
@@ -145,7 +166,7 @@ export default function AppLayout() {
         <div className={`absolute right-4 top-[60px] w-56 bg-[#FDFAF5] rounded-2xl shadow-2xl border border-black/6 overflow-hidden z-50 transition-[opacity,transform] ease-out origin-top-right ${
           menuOpen
             ? 'opacity-100 scale-100 duration-150'
-            : 'opacity-0 scale-95 pointer-events-none duration-0'
+            : 'opacity-0 scale-95 pointer-events-none duration-150'
         }`}>
           <Link
             to="/profile"
@@ -180,6 +201,15 @@ export default function AppLayout() {
             Settings
           </Link>
           <button
+            onClick={() => { setMenuOpen(false); setVatCalcOpen(true) }}
+            className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-gray-600 hover:bg-black/4 transition-colors cursor-pointer border-t border-black/6"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            VAT Calculator
+          </button>
+          <button
             onClick={handleLogout}
             className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-danger hover:bg-brand-terra/5 transition-colors cursor-pointer"
           >
@@ -207,6 +237,9 @@ export default function AppLayout() {
         </div>
       </main>
 
+      {/* ── VAT Calculator modal ────────────────────────────────────── */}
+      {vatCalcOpen && <VatCalc onClose={() => setVatCalcOpen(false)} />}
+
       {/* ── Mobile floating bottom nav ──────────────────────────────── */}
       <nav className="md:hidden fixed bottom-4 left-3 right-3 z-40 select-none">
         <div
@@ -221,6 +254,7 @@ export default function AppLayout() {
               key={item.to}
               to={item.to}
               style={{ touchAction: 'manipulation' }}
+              onClick={() => setMenuOpen(false)}
               className={({ isActive }) => {
                 const active = isActive || (item.to === '/office' && isOfficeActive)
                 return `flex-1 flex flex-col items-center gap-0.5 py-2 px-1 rounded-[22px] text-[10px] font-semibold transition-all duration-200 ${

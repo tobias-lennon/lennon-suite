@@ -5,6 +5,9 @@ Thumbs.db
 # Windows
 desktop.ini
 
+# Personal dev tooling — never commit
+CLAUDE.md
+deploy.py
+
 # Server credential files — never commit
 backend/.env.server
-deploy.py

@@ -259,9 +259,10 @@ export default function ContactForm() {
               <input
                 type="number"
                 min="0"
-                step="0.01"
+                step="any"
                 value={form.day_rate}
                 onChange={e => set('day_rate', e.target.value)}
+                onBlur={e => { const v = e.target.valueAsNumber; if (!isNaN(v)) set('day_rate', v.toFixed(2)) }}
                 placeholder="e.g. 250.00"
                 className={`field-input${errors.day_rate ? ' field-error' : ''}`}
               />

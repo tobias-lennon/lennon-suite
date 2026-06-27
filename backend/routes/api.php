@@ -3,6 +3,9 @@
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CustomerFollowupController;
 use App\Http\Controllers\JobTaskController;
+use App\Http\Controllers\MyHoursController;
+use App\Http\Controllers\MyPayslipsController;
+use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserController;
@@ -56,6 +59,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/settings',    [SettingsController::class, 'show']);
         Route::get('/employees',   [EmployeeController::class, 'index']);
         Route::get('/rate-cards',  [RateCardController::class, 'index']);
+        Route::get('/my-hours',    [MyHoursController::class, 'index']);
+        Route::get('/my-payslips',              [MyPayslipsController::class, 'index']);
+        Route::get('/my-payslips/{payslip}/pdf', [MyPayslipsController::class, 'downloadPdf']);
 
         Route::get('/weather',                          [WeatherController::class, 'hq']);
         Route::get('/weather/customers/{customer}',     [WeatherController::class, 'forCustomer']);
@@ -104,10 +110,25 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/jobs/{job}/tasks/{task}',    [JobTaskController::class, 'destroy']);
 
         Route::apiResource('/invoices', InvoiceController::class)->only(['store', 'destroy']);
-        Route::post('/invoices/{invoice}/payment',      [InvoiceController::class, 'recordPayment']);
-        Route::patch('/invoices/{invoice}/status',      [InvoiceController::class, 'updateStatus']);
+        Route::post('/invoices/{invoice}/payment',       [InvoiceController::class, 'recordPayment']);
+        Route::patch('/invoices/{invoice}/status',       [InvoiceController::class, 'updateStatus']);
+        Route::post('/invoices/{invoice}/apply-loyalty', [InvoiceController::class, 'applyLoyaltyCredit']);
 
         Route::patch('/settings', [SettingsController::class, 'update']);
+
+        Route::post('/employees',                [EmployeeController::class, 'store']);
+        Route::patch('/employees/{employee}',    [EmployeeController::class, 'update']);
+        Route::delete('/employees/{employee}',   [EmployeeController::class, 'destroy']);
+
+        Route::patch('/rate-cards/{rateCard}',   [RateCardController::class, 'update']);
+
+        Route::get('/payroll',                                        [PayrollController::class, 'index']);
+        Route::post('/payroll',                                       [PayrollController::class, 'store']);
+        Route::get('/payroll/{run}',                                  [PayrollController::class, 'show']);
+        Route::delete('/payroll/{run}',                               [PayrollController::class, 'destroy']);
+        Route::post('/payroll/{run}/finalise',                        [PayrollController::class, 'finalise']);
+        Route::patch('/payroll/{run}/payslips/{payslip}',             [PayrollController::class, 'updatePayslip']);
+        Route::get('/payroll/{run}/payslips/{payslip}/pdf',           [PayrollController::class, 'downloadPayslipPdf']);
 
         Route::apiResource('/contacts', ContactController::class)->only(['store', 'update', 'destroy']);
 

@@ -12,7 +12,7 @@ class InvoiceGenerationService
     public function generate(int $jobId, ?int $dueDays = null, ?string $notes = null): Invoice
     {
         $job = FieldJob::with([
-            'customer',
+            'customer.rateCard',
             'workLogs' => fn($q) => $q->orderBy('date'),
             'workLogs.entries.employee:id,name',
             'workLogs.materials',
@@ -91,15 +91,12 @@ class InvoiceGenerationService
 
             foreach ($log->materials as $material) {
                 if ($material->amount_charged > 0) {
-                    $qty  = $material->qty ?? 1;
-                    $desc = $material->description;
-                    if ($material->qty) {
-                        $desc .= " ({$material->qty}" . ($material->unit ? " {$material->unit}" : '') . ')';
-                    }
+                    $qty = $material->qty ?? 1;
                     $lineItems[] = [
                         'type'        => 'material',
-                        'description' => $desc,
+                        'description' => $material->description,
                         'quantity'    => (float) $qty,
+                        'unit'        => $material->unit ?: null,
                         'unit_price'  => round($material->amount_charged / max((float) $qty, 1), 2),
                         'amount'      => (float) $material->amount_charged,
                     ];
@@ -113,6 +110,14 @@ class InvoiceGenerationService
     private function loyaltySnapshot(FieldJob $job): array
     {
         if ($job->type !== 'maintenance' || !$job->customer) {
+            return [null, null];
+        }
+
+        if ($job->customer->skip_loyalty) {
+            return [null, null];
+        }
+
+        if ($job->customer->rateCard?->skip_loyalty) {
             return [null, null];
         }
 

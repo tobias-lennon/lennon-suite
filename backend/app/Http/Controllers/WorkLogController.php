@@ -150,6 +150,16 @@ class WorkLogController extends Controller
     {
         abort_if($log->field_job_id !== $job->id, 404);
 
+        if ($job->type === 'maintenance') {
+            $customer = $job->customer()->with('rateCard')->first();
+            if ($customer) {
+                $totalHours = (float) $log->entries()->sum('billable_hours');
+                if ($totalHours > 0) {
+                    $this->rateService->reverseMaintenanceLoyalty($customer, $totalHours);
+                }
+            }
+        }
+
         $log->delete();
 
         return response()->json(null, 204);

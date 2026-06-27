@@ -29,6 +29,8 @@ class Invoice extends Model
         'gnucash_exported_at',
         'loyalty_hours_earned',
         'loyalty_balance_after',
+        'loyalty_credit_applied',
+        'loyalty_credit_amount',
     ];
 
     protected function casts(): array
@@ -45,8 +47,10 @@ class Invoice extends Model
             'vat_amount'           => 'float',
             'total_due'            => 'float',
             'amount_paid'          => 'float',
-            'loyalty_hours_earned' => 'float',
-            'loyalty_balance_after'=> 'float',
+            'loyalty_hours_earned'   => 'float',
+            'loyalty_balance_after'  => 'float',
+            'loyalty_credit_applied' => 'boolean',
+            'loyalty_credit_amount'  => 'float',
         ];
     }
 

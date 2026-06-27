@@ -33,7 +33,7 @@ describe('Login', () => {
     const user = userEvent.setup()
     renderSimple(<Login />)
     await user.type(await screen.findByPlaceholderText('you@lennonlandscaping.ie'), 'tobias@lennonlandscaping.ie')
-    await user.type(screen.getByPlaceholderText('••••••••'), 'Lennon2026!')
+    await user.type(screen.getByPlaceholderText('••••••••'), 'Admin2026!')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
     await waitFor(() => {
       expect(screen.queryByText(/required/i)).not.toBeInTheDocument()
@@ -50,7 +50,7 @@ describe('Login', () => {
     const user = userEvent.setup()
     renderSimple(<Login />)
     await user.type(await screen.findByPlaceholderText('you@lennonlandscaping.ie'), 'tobias@lennonlandscaping.ie')
-    await user.type(screen.getByPlaceholderText('••••••••'), 'Lennon2026!')
+    await user.type(screen.getByPlaceholderText('••••••••'), 'Admin2026!')
     const btn = screen.getByRole('button', { name: /sign in/i })
     await user.click(btn)
     expect(btn).toBeDisabled()

@@ -15,7 +15,7 @@ class AdminUserSeeder extends Seeder
             [
                 'name'     => 'Tobias Lennon',
                 'email'    => 'tobias@lennonlandscaping.ie',
-                'password' => Hash::make('Lennon2026!'),
+                'password' => Hash::make('Admin2026!'),
                 'role'     => 'admin',
             ]
         );

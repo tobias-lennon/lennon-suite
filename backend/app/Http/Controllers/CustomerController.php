@@ -68,6 +68,8 @@ class CustomerController extends Controller
                 'minutes_from_hq'     => isset($data['minutes_from_hq']) ? (int) $data['minutes_from_hq'] : null,
                 'discount_pct'        => $data['discount_pct'] ?? null,
                 'default_callout_fee' => $data['default_callout_fee'] ?? null,
+                'custom_rate'         => $data['custom_rate'] ?? null,
+                'skip_loyalty'        => $data['skip_loyalty'] ?? false,
             ],
             'address' => [
                 'address_line_1' => $this->clean($addr['address_line_1'] ?? null),
@@ -164,6 +166,8 @@ class CustomerController extends Controller
             'minutes_from_hq'         => 'nullable|integer|min:1|max:600',
             'discount_pct'            => 'nullable|numeric|min:0|max:100',
             'default_callout_fee'     => 'nullable|numeric|min:0',
+            'custom_rate'             => 'nullable|numeric|min:0',
+            'skip_loyalty'            => 'nullable|boolean',
             'address.address_line_1'  => 'nullable|string|max:255',
             'address.address_line_2'  => 'nullable|string|max:255',
             'address.city'            => 'nullable|string|max:100',
@@ -205,6 +209,8 @@ class CustomerController extends Controller
             'minutes_from_hq'         => 'nullable|integer|min:1|max:600',
             'discount_pct'            => 'nullable|numeric|min:0|max:100',
             'default_callout_fee'     => 'nullable|numeric|min:0',
+            'custom_rate'             => 'nullable|numeric|min:0',
+            'skip_loyalty'            => 'nullable|boolean',
             'address.address_line_1'  => 'nullable|string|max:255',
             'address.address_line_2'  => 'nullable|string|max:255',
             'address.city'            => 'nullable|string|max:100',
@@ -224,6 +230,8 @@ class CustomerController extends Controller
             'minutes_from_hq'     => array_key_exists('minutes_from_hq',     $clean['customer']) ? ($clean['customer']['minutes_from_hq']     ?? null)                          : $customer->minutes_from_hq,
             'discount_pct'        => array_key_exists('discount_pct',        $clean['customer']) ? ($clean['customer']['discount_pct']        ?? 0)                             : $customer->discount_pct,
             'default_callout_fee' => array_key_exists('default_callout_fee', $clean['customer']) ? ($clean['customer']['default_callout_fee'] ?? null)                          : $customer->default_callout_fee,
+            'custom_rate'         => array_key_exists('custom_rate',         $clean['customer']) ? ($clean['customer']['custom_rate']         ?? null)                          : $customer->custom_rate,
+            'skip_loyalty'        => array_key_exists('skip_loyalty',        $clean['customer']) ? (bool) $clean['customer']['skip_loyalty']                                    : $customer->skip_loyalty,
         ]);
 
         if (isset($data['address'])) {

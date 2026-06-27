@@ -63,6 +63,7 @@ class WorkLogEntryController extends Controller
         abort_if($entry->work_log_id !== $log->id, 404);
 
         $data = $request->validate([
+            'employee_id'     => 'sometimes|exists:employees,id',
             'start_time'      => 'nullable|date_format:H:i',
             'end_time'        => 'nullable|date_format:H:i',
             'break_minutes'   => 'integer|min:0',
@@ -70,14 +71,20 @@ class WorkLogEntryController extends Controller
             'has_power_tools' => 'boolean',
         ]);
 
+        $oldHours        = (float) $entry->billable_hours;
+        $employeeChanged = isset($data['employee_id']) && (int) $data['employee_id'] !== $entry->employee_id;
+        $employee        = $employeeChanged ? Employee::find($data['employee_id']) : null;
+        $payRate         = $employee ? $employee->pay_rate : $entry->pay_rate;
+
         $ratePerHour = $entry->rate_per_hour;
-        if (array_key_exists('has_power_tools', $data)) {
-            $job         = $log->fieldJob()->with('customer.rateCard')->first();
-            $customer    = $job->customer;
+        if ($employeeChanged || array_key_exists('has_power_tools', $data)) {
+            $job      = $log->fieldJob()->with('customer.rateCard')->first();
+            $customer = $job->customer;
             if ($customer) {
-                $ratePerHour = $this->rateService->calculateRate(
+                $hasPowerTools = (bool) ($data['has_power_tools'] ?? $entry->has_power_tools);
+                $ratePerHour   = $this->rateService->calculateRate(
                     $job, $customer,
-                    (bool) $data['has_power_tools'],
+                    $hasPowerTools,
                     (bool) $log->has_waste_disposal
                 );
             }
@@ -85,9 +92,10 @@ class WorkLogEntryController extends Controller
 
         $hours         = (float) $data['billable_hours'];
         $amountCharged = round($hours * $ratePerHour, 2);
-        $amountPaid    = round($hours * $entry->pay_rate, 2);
+        $amountPaid    = round($hours * $payRate, 2);
 
         $entry->update(array_merge($data, [
+            'pay_rate'       => $payRate,
             'billable_hours' => $hours,
             'rate_per_hour'  => $ratePerHour,
             'amount_charged' => $amountCharged,
@@ -95,12 +103,31 @@ class WorkLogEntryController extends Controller
             'margin'         => round($amountCharged - $amountPaid, 2),
         ]));
 
+        $hoursDiff = round($hours - $oldHours, 2);
+        if ($hoursDiff != 0) {
+            if (!isset($job)) {
+                $job = $log->fieldJob()->with('customer.rateCard')->first();
+            }
+            if ($job->type === 'maintenance' && $job->customer) {
+                if ($hoursDiff > 0) {
+                    $this->rateService->checkMaintenanceLoyalty($job->customer, $hoursDiff);
+                } else {
+                    $this->rateService->reverseMaintenanceLoyalty($job->customer, abs($hoursDiff));
+                }
+            }
+        }
+
         return response()->json($entry->load('employee:id,name'));
     }
 
     public function destroy(WorkLog $log, WorkLogEntry $entry): JsonResponse
     {
         abort_if($entry->work_log_id !== $log->id, 404);
+
+        $job = $log->fieldJob()->with('customer.rateCard')->first();
+        if ($job->type === 'maintenance' && $job->customer) {
+            $this->rateService->reverseMaintenanceLoyalty($job->customer, (float) $entry->billable_hours);
+        }
 
         $entry->delete();
 

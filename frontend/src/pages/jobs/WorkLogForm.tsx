@@ -356,6 +356,7 @@ export default function WorkLogForm() {
         for (const entry of entries) {
           if (entry.id) {
             await api.patch(`/logs/${logId}/entries/${entry.id}`, {
+              employee_id: Number(entry.employee_id),
               start_time: entry.start_time || null,
               end_time: entry.end_time || null,
               break_minutes: Number(entry.break_minutes || 0),
@@ -541,8 +542,7 @@ export default function WorkLogForm() {
                     <select
                       value={entry.employee_id}
                       onChange={e => updateEntry(i, 'employee_id', e.target.value)}
-                      disabled={isEdit}
-                      className={`field-input${errors[`entry_${i}_employee`] ? ' field-error' : ''}${isEdit ? ' opacity-60 cursor-not-allowed' : ''}`}
+                      className={`field-input${errors[`entry_${i}_employee`] ? ' field-error' : ''}`}
                     >
                       <option value="">— Select —</option>
                       {employees.map(emp => (
@@ -690,11 +690,11 @@ export default function WorkLogForm() {
                         <span className="text-sm text-gray-400 shrink-0">€</span>
                         <input
                           type="number"
-                          step="0.01"
+                          step="any"
                           min="0"
                           value={mat.cost_paid}
                           onChange={e => updateMaterial(i, 'cost_paid', e.target.value)}
-                          onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) updateMaterial(i, 'cost_paid', v.toFixed(2)) }}
+                          onBlur={e => { const v = e.target.valueAsNumber; if (!isNaN(v)) updateMaterial(i, 'cost_paid', v.toFixed(2)) }}
                           placeholder="0.00"
                           className={`field-input${errors[`mat_${i}_cost`] ? ' field-error' : ''}`}
                         />
@@ -708,11 +708,11 @@ export default function WorkLogForm() {
                         <span className="text-sm text-gray-400 shrink-0">€</span>
                         <input
                           type="number"
-                          step="0.01"
+                          step="any"
                           min="0"
                           value={mat.amount_charged}
                           onChange={e => updateMaterial(i, 'amount_charged', e.target.value)}
-                          onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) updateMaterial(i, 'amount_charged', v.toFixed(2)) }}
+                          onBlur={e => { const v = e.target.valueAsNumber; if (!isNaN(v)) updateMaterial(i, 'amount_charged', v.toFixed(2)) }}
                           placeholder="0.00"
                           className={`field-input${errors[`mat_${i}_charged`] ? ' field-error' : ''}`}
                         />

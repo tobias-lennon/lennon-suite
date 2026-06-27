@@ -249,18 +249,18 @@
     <tr>
       <td class="bill-to-cell">
         <div class="section-label">Bill To</div>
-        <div class="customer-name">{{ ucwords(strtolower($invoice->customer->name)) }}</div>
+        <div class="customer-name">{{ ucwords(strtolower($invoice->customer->name), " \t\r\n\f\v'") }}</div>
 
         @if($invoice->customer->address)
           @php $addr = $invoice->customer->address @endphp
           @if($addr->address_line_1)
-            <div class="address-line">{{ ucwords(strtolower($addr->address_line_1)) }}</div>
+            <div class="address-line">{{ ucwords(strtolower($addr->address_line_1), " \t\r\n\f\v'") }}</div>
           @endif
           @if($addr->address_line_2)
-            <div class="address-line">{{ ucwords(strtolower($addr->address_line_2)) }}</div>
+            <div class="address-line">{{ ucwords(strtolower($addr->address_line_2), " \t\r\n\f\v'") }}</div>
           @endif
           @if($addr->city)
-            <div class="address-line">{{ ucwords(strtolower($addr->city)) }}{{ $addr->county ? ', ' . ucwords(strtolower($addr->county)) : '' }}</div>
+            <div class="address-line">{{ ucwords(strtolower($addr->city), " \t\r\n\f\v'") }}{{ $addr->county ? ', ' . ucwords(strtolower($addr->county), " \t\r\n\f\v'") : '' }}</div>
           @endif
           @if($addr->postcode)
             <div class="address-line">{{ strtoupper($addr->postcode) }}</div>
@@ -295,6 +295,10 @@
               <td class="info-value">{{ $invoice->paid_at->format('d/m/Y') }}</td>
             </tr>
           @endif
+          <tr>
+            <td class="info-label">Job Type</td>
+            <td class="info-value">{{ ucfirst($invoice->job->type) }}</td>
+          </tr>
         </table>
       </td>
     </tr>
@@ -317,16 +321,35 @@
       @endphp
 
       @if($labourItems->isNotEmpty())
+        @php
+          $labourByDate = [];
+          $labourDateOrder = [];
+          foreach ($labourItems as $item) {
+            preg_match('/(\d{2}\/\d{2}\/\d{4})$/', trim($item->description), $m);
+            $key = $m[1] ?? 'unknown';
+            if (!isset($labourByDate[$key])) {
+              $labourByDate[$key] = ['hours' => 0, 'amount' => 0];
+              $labourDateOrder[] = $key;
+            }
+            $labourByDate[$key]['hours']  += $item->quantity;
+            $labourByDate[$key]['amount'] += $item->amount;
+          }
+        @endphp
         <tr>
           <td colspan="3" style="padding: 4px 10px; font-size:7.5px; font-weight:bold; color:#0F3714; text-transform:uppercase; letter-spacing:1px; background:#eef6d6; border-top:1px solid #c8e08a;">
             Labour
           </td>
         </tr>
-        @foreach($labourItems as $item)
+        @foreach($labourDateOrder as $visitNum => $key)
+          @php
+            try { $visitDate = \Carbon\Carbon::createFromFormat('d/m/Y', $key)->format('j M Y'); }
+            catch (\Exception $e) { $visitDate = $key; }
+            $row = $labourByDate[$key];
+          @endphp
           <tr class="labour-row">
-            <td>{{ $item->description }}</td>
-            <td class="right muted">{{ number_format($item->quantity, 2) }}h</td>
-            <td class="right">€{{ number_format($item->amount, 2) }}</td>
+            <td>Visit {{ $visitNum + 1 }} — {{ $visitDate }}</td>
+            <td class="right muted">{{ number_format($row['hours'], 2) }}h</td>
+            <td class="right">€{{ number_format($row['amount'], 2) }}</td>
           </tr>
         @endforeach
       @endif
@@ -338,9 +361,14 @@
           </td>
         </tr>
         @foreach($materialItems as $item)
+          @php
+            $qtyDisplay = fmod((float) $item->quantity, 1) == 0
+              ? (int) $item->quantity
+              : number_format($item->quantity, 2);
+          @endphp
           <tr class="material-row">
             <td>{{ $item->description }}</td>
-            <td class="right muted">{{ number_format($item->quantity, 1) }}</td>
+            <td class="right muted">{{ $qtyDisplay }}{{ $item->unit ? ' ' . $item->unit : '' }}</td>
             <td class="right">€{{ number_format($item->amount, 2) }}</td>
           </tr>
         @endforeach
@@ -390,6 +418,13 @@
             <td class="t-value">€{{ number_format($invoice->vat_amount, 2) }}</td>
           </tr>
 
+          @if($invoice->loyalty_credit_applied && $invoice->loyalty_credit_amount)
+          <tr style="background:#f3f8e8;">
+            <td class="t-label" style="color:#15803d;">&#9733; Loyalty Reward</td>
+            <td class="t-value" style="color:#15803d;">&minus;&euro;{{ number_format($invoice->loyalty_credit_amount, 2) }}</td>
+          </tr>
+          @endif
+
           <tr class="total-due-row">
             <td class="t-label">{{ $type === 'receipt' ? 'Total Charged' : 'Total Due' }}</td>
             <td class="t-value">€{{ number_format($invoice->total_due, 2) }}</td>
@@ -401,12 +436,32 @@
 
   {{-- ── Loyalty Snapshot (maintenance jobs only) ── --}}
   @if($invoice->loyalty_hours_earned !== null && $invoice->loyalty_balance_after !== null)
+  @php $threshold = $settings->loyalty_threshold_hours ?? 60; @endphp
   <div style="margin-top:14px; background:#f3f8e8; border:1.5px solid #c8e08a; border-radius:5px; padding:8px 12px;">
     <span style="font-size:7.5px; font-weight:bold; color:#0F3714; text-transform:uppercase; letter-spacing:1px;">&#9733; Maintenance Loyalty Programme</span>
-    <div style="font-size:8.5px; color:#444; margin-top:3px; line-height:1.6;">
-      You earned <strong>{{ number_format($invoice->loyalty_hours_earned, 1) }} hrs</strong> on this job &mdash;
-      current balance: <strong>{{ number_format($invoice->loyalty_balance_after, 1) }} / 60 hrs</strong> towards your next free visit.
-    </div>
+
+    @if($invoice->loyalty_credit_applied)
+      {{-- Credit was redeemed on this invoice --}}
+      <div style="font-size:8.5px; color:#444; margin-top:3px; line-height:1.6;">
+        <strong style="color:#15803d;">&#10003; Complimentary visit redeemed on this invoice.</strong><br>
+        Points earned this job: <strong>{{ number_format($invoice->loyalty_hours_earned, 1) }}</strong> &mdash;
+        balance remaining: <strong>{{ number_format($invoice->loyalty_balance_after, 1) }} / {{ $threshold }} points</strong> towards your next free visit.
+      </div>
+    @elseif($invoice->loyalty_balance_after >= $threshold)
+      {{-- Hit threshold but not yet redeemed --}}
+      @php $overflow = fmod($invoice->loyalty_balance_after, $threshold); @endphp
+      <div style="font-size:8.5px; color:#444; margin-top:3px; line-height:1.6;">
+        You earned <strong>{{ number_format($invoice->loyalty_hours_earned, 1) }} points</strong> on this job &mdash;
+        <strong>you've earned a complimentary maintenance visit!</strong><br>
+        <strong>{{ number_format($overflow, 1) }} points</strong> towards your next free visit &mdash; redeem at your discretion.
+      </div>
+    @else
+      {{-- Still building points --}}
+      <div style="font-size:8.5px; color:#444; margin-top:3px; line-height:1.6;">
+        You earned <strong>{{ number_format($invoice->loyalty_hours_earned, 1) }} points</strong> on this job &mdash;
+        current balance: <strong>{{ number_format($invoice->loyalty_balance_after, 1) }} / {{ $threshold }} points</strong> towards your next free visit.
+      </div>
+    @endif
   </div>
   @endif
 
@@ -444,8 +499,8 @@
             <div class="bank-details">
               <strong>Bank Transfer:</strong><br>
               Account Name: Lennon Landscaping<br>
-              IBAN: IE22 AIBK 9361 5417 3460 64<br>
-              BIC: AIBKIE2D
+              IBAN: {{ env('COMPANY_IBAN') }}<br>
+              BIC: {{ env('COMPANY_BIC') }}
             </div>
             <div class="bank-details" style="margin-top:6px;">
               <strong>Cash</strong> payments also accepted.

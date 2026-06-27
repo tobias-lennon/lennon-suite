@@ -377,12 +377,12 @@ describe('WorkLogForm — Edit mode', () => {
     expect(btn).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('employee dropdown is disabled in edit mode', async () => {
+  it('employee dropdown is enabled in edit mode', async () => {
     renderEditForm()
     await screen.findByText('Edit Work Log')
     await waitFor(() => {
       const sel = screen.getByRole('combobox')
-      expect(sel).toBeDisabled()
+      expect(sel).not.toBeDisabled()
     })
   })
 

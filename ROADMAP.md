@@ -1,233 +1,272 @@
 # Lennon Suite — Integration Roadmap
-*Last updated: 2026-04-22*
+*Last updated: 2026-05-26*
 
 Each phase is ordered by dependency. A phase should be feature-complete and stable before
 the next begins. Features within a phase can be built in any order unless noted.
 
 ---
 
-## Phase 1 — Foundation Hardening
-*The app is stable. Before adding complexity, close the gaps that will cause pain later.*
+## ✅ Completed
 
-### 1.1 Company Settings (Admin)
-**What:** A settings page storing company-wide values used across the system.
-**Fields:** Company name, address, VAT number, logo, HQ eircode/coordinates, default VAT
-rate (currently hardcoded 13.5%), default invoice due days (currently hardcoded 30),
-minimum billable days target (e.g. 160/year).
-**Why now:** Invoice PDFs currently have no company details. VAT rate and due days are
-hardcoded. Everything downstream (finance, overhead calc) reads from here.
-**Pain points to resolve:** PDF template needs company detail injection. VAT rate must be
-pulled from settings not hardcoded.
+### Phase 1 — Foundation Hardening
+- **1.1** Company Settings (name, address, VAT number, logo, HQ eircode, default VAT rate, due days, target billable days, monthly overheads)
+- **1.2** Customer — minutes from HQ field
+- **1.3** Follow-up notes on work logs *(partial — field exists, banner not yet implemented → see Phase 7)*
+- **1.4** Lead — site visit badge on list
+- **1.5** User roles (admin / field / customer) with middleware
 
-### 1.2 Customer — Minutes from HQ
-**What:** `minutes_from_hq` integer field on customers. Manually entered.
-**Why now:** Small change, used immediately for scheduling and route planning later.
-No API dependency.
+### Phase 1.6 — Suppliers & Contacts Directory
+Full CRUD contacts module: supplier companies, supplier individuals, tradesmen (with day rate), other. Accessible via Office section.
 
-### 1.3 Follow-up Notes on Work Logs
-**What:** `follow_up_note` text field on WorkLog. Surfaces as a banner when:
-- Opening the work log form for a new log on the same job
-- Creating a new job for the same customer
-**Why now:** Ties into scheduling — you need to see "bring weed suppressor" before
-heading out. Also feeds into the customer portal later.
+### Phase 2 — Scheduling & Weather
+- Met.éireann forecast widget on dashboard (per-customer lat/lng via Nominatim)
+- Weekly scheduling view with drag-and-drop, weather colour coding
+- Rule-based scheduling suggestions (weather_req, due date proximity, overdue maintenance)
 
-### 1.4 Lead — Site Visit Badge on List
-**What:** Surface `requires_site_visit` as a badge on the leads list. Currently saved
-but invisible.
-**Why now:** The field exists, it just needs to be shown.
+### Phase 3 — Employee Management, Field Role & Payroll
+- Employee admin panel (CRUD, pay rates, PPSN, RPN data: tax credits, rate cut-off, USC status)
+- Field user app view (jobs, work log entry, my hours, my payslips)
+- Weekly payroll runs: auto-pull hours from work logs, add extra hours, full Irish 2025 tax calc (PAYE/PRSI/USC from RPN), payslip PDF, ROS submission summary
 
-### 1.5 User Roles (Groundwork Only)
-**What:** Add a `role` column to users: `admin`, `field`, `customer`. Current users are
-all `admin`. Add middleware that checks role on protected routes.
-**Why now:** Every phase after this adds role-restricted features. Retrofitting roles
-onto a built system is painful. The groundwork is a small migration + middleware change.
-**Note:** No UI change needed yet — just the plumbing.
+### Leads Module
+Full CRM pipeline: lead capture, site visit flag, status tracking, conversion to job.
+
+### Materials Tracking
+Per-job materials logging with cost, used in job cost calculations.
 
 ---
 
-## Phase 2 — Scheduling & Weather
-*Depends on: 1.1 (HQ eircode for weather), 1.2 (minutes from HQ for routing)*
+## Phase 4 — Task Overhaul
+*No dependencies. Fix now — current task system is not fit for purpose.*
 
-### 2.1 Weather Dashboard Widget
-**What:** Met.éireann free public API, no key required. Show 5-day forecast on the
-dashboard. Each day shows condition icon, temp range, rain probability.
-**Per-job weather:** Convert customer eircode to lat/lng (one-time, stored on customer).
-Pull forecast for that location when viewing a job.
-**API:** `https://api.met.ie/opendata/pwsstation.jsonld` / forecast endpoint.
-**Pain points:** Need lat/lng on customer — add `latitude` and `longitude` nullable
-floats, populate via free geocoding (OpenStreetMap Nominatim, no key, no limit).
+### What's wrong
+Tasks exist but lack structure, assignment, and urgency — not used in practice.
 
-### 2.2 Weekly Scheduling View
-**What:** A dedicated scheduling page. Week grid (Mon–Sun), each day shows:
-- Weather summary for that day (from Met.éireann)
-- Jobs assigned to that day
-- Total estimated hours
-- Colour coding: green = dry, amber = mixed, red = rain
-Drag jobs onto days. Jobs panel on the side shows unscheduled jobs sorted by priority
-and due date.
-**New field needed:** `scheduled_date` already exists on FieldJob. Just need the UI.
-
-### 2.3 Scheduling Suggestions
-**What:** Rule-based only (no AI). For each unscheduled job:
-- `weather_req: dry_only` → only suggest on forecast-dry days
-- `weather_req: dry_preferred` → prefer dry days, allow light rain
-- `weather_req: any` → any day
-- Maintenance jobs overdue → flagged and prioritised
-- Due date proximity → jobs approaching due_by surfaced first
-Show suggested day assignments. User can accept or override.
+### What it needs
+- **Types:** one-off task, recurring task, follow-up reminder
+- **Assignment:** assign to a user (admin or field) or leave unassigned (general)
+- **Linked context:** optionally linked to a Customer, Job, Lead, or Contact
+- **Due date + priority** (low / normal / urgent)
+- **Status:** open → in progress → done
+- **Dashboard badge:** task count on home screen for assigned open tasks
+- **Notifications:** in-app alert when a task is assigned to you or becomes overdue
+- **Recurring tasks:** define interval (daily / weekly / monthly), auto-generates next instance on completion
 
 ---
 
-## Phase 3 — Employee Management & Field User Role
-*Depends on: 1.5 (role groundwork)*
+## Phase 5 — Scheduling Improvements
+*Depends on: Phase 4 (tasks can be linked to schedule)*
 
-### 3.1 Employee Admin Panel
-**What:** Full CRUD for employees from admin settings. Currently employees exist in the
-DB but there's no management UI.
-**Fields:** Name, phone, email, role (labourer/supervisor), pay rate, active/inactive.
-**Note:** Employees are not the same as users currently. Decision needed: do employees
-get app logins? If yes, link Employee → User. Recommend yes — field users need to log
-their own hours eventually.
-
-### 3.2 Field User App View
-**What:** Stripped-down app view for `role: field` users.
-**Sees:** Only jobs assigned to them for the day/week, ability to log their own hours on
-a work log, their own pay summary.
-**Cannot see:** Financials, other employees' rates, customer details beyond name/address,
-invoices.
-**Pain points:** Current job/customer detail pages expose everything. Need route-level
-and component-level role guards.
+### What to improve
+- Reduce friction when assigning/moving jobs — fewer taps to reschedule
+- Visual density: show more info per day without scrolling
+- Unscheduled jobs panel improvements: filter by type, weather req, customer area
+- Multi-day job support: a job that spans e.g. 3 days, shows across all 3
+- "Clone to next week" for recurring maintenance jobs
+- Quick-add job directly from the schedule day view (not via Jobs → New)
 
 ---
 
-## Phase 4 — Financial Engine
-*Depends on: 1.1 (VAT rate, company settings), Phase 3 (employee costs are real)*
+## Phase 6 — Follow-up Notifications, Notes & Customer Info
+*Depends on: Phase 4 (tasks are the follow-up mechanism)*
+
+### Follow-up system
+- **Follow-up note on work log:** when closing a work log, optionally set a follow-up reminder (text + date). Surfaces as a task automatically.
+- **Follow-up banner:** when opening a new work log or job for the same customer, show any open follow-up notes as a banner
+- **Lead follow-ups:** same mechanism — "call back Thursday", auto-creates task
+
+### Customer info improvements
+- Emergency/secondary contact field
+- Customer-level notes (not per-job — general relationship notes)
+- "Last visited" and "Next scheduled" surfaced on customer card
+- Customer tags (e.g. "maintenance contract", "one-off", "nursery customer")
+- Preferred contact method (call / text / email)
+
+---
+
+## Phase 7 — Quoting & Pricing System
+*No hard dependencies. Recommend after Phase 6 so customer info is solid before generating quotes.*
+*Feeds into Phase 8 (Financial Engine) — quotes carry internal cost breakdown used in job profitability.*
+
+### 7.1 Activity Timer & Averages
+Repeatable physical activities (emptying recycling trailer, loading manure trailer, etc.) are timed over multiple instances to build averages used in pricing.
+
+- Admin logs an activity: name + duration (either live stopwatch or log-after-the-fact entry)
+- System calculates rolling average per activity type over last N instances
+- Averages are used as time estimates when building a quote
+
+### 7.2 Rate Calculators
+Parameterised pricing formulas for common job types. Admin configures base rates, calculator produces a cost/time estimate.
+
+**Examples:**
+- Hedge cutting: X metres × rate per metre = estimated price + estimated hours
+- Wildflower bed: X m² × rate per m² = estimated price
+- Lawn cut: X m² band → estimated time
+- Custom: free-form item with manual hours + rate
+
+Rates are editable by admin. Calculators feed directly into quote line items.
+
+### 7.3 Quote Builder
+A quote is assembled from a mix of calculator outputs, activity time estimates, and manual line items.
+
+**Internal cost breakdown (admin view):**
+- Labour: estimated hours × employee pay rate + employer PRSI
+- Materials: cost price (what you pay) + markup → charged price
+- Equipment rental: cost
+- Tools/consumables: cost
+- Overhead allocation: auto-calculated from company settings (cost per billable day × estimated days)
+- Contingency buffer: configurable % (e.g. 10%)
+- Target profit margin: configurable %
+- **Total cost to business / Total charged to customer / Estimated profit**
+
+**Customer-facing breakdown (abstracted):**
+Admin groups internal line items into customer-readable categories, e.g.:
+- Site Preparation
+- Materials & Planting
+- Labour
+- Waste Removal
+- Equipment
+
+Customer sees category totals only — not internal costs, margins, or pay rates.
+
+### 7.4 Quote Lifecycle
+- Statuses: Draft → Sent → Accepted / Declined / Expired
+- Generate customer-facing PDF (abstracted breakdown, company branding, signature line)
+- Convert accepted quote → Job (pre-fills job details from quote)
+- Declined quotes: log reason (optional), auto-create follow-up task
+
+---
+
+## Phase 8 — Financial Engine
+*Depends on: Company Settings (done), Payroll (done), Materials Tracking (done), Phase 7 (quotes carry cost data)*
 *This is the most complex phase. Plan each sub-feature before building.*
 
-### 4.1 Double-Entry Bookkeeping Core
-**What:** A `journal_entries` table. Every financial event auto-posts a journal entry:
+### 8.1 Double-Entry Bookkeeping Core
+A `journal_entries` table. Every financial event auto-posts a journal entry:
 - Invoice raised → Debit Accounts Receivable, Credit Revenue
 - Payment received → Debit Bank, Credit Accounts Receivable
 - Material purchased → Debit Materials Cost, Credit Bank/Creditors
 - Wage paid → Debit Labour Cost, Credit Bank
-**Chart of accounts:** Predefined for a sole trader (Revenue, COGS, Overheads, Assets,
-Liabilities). Not user-configurable to start.
-**Why not GnuCash:** Two sources of truth = guaranteed drift. Build it in.
+- Quote converted → estimated cost entries for planning
 
-### 4.2 Overhead Allocation
-**What:** Fixed overheads entered in company settings (insurance, fuel, equipment,
-phone, etc.). System calculates cost-per-billable-day based on target days (from 1.1).
-Each job gets an overhead allocation displayed on the job detail and factored into
-margin reporting.
-**Fields needed on company settings:** Monthly overhead line items.
+Chart of accounts: predefined for a sole trader (Revenue, COGS, Overheads, Assets, Liabilities). Not user-configurable to start.
 
-### 4.3 P&L Dashboard
-**What:** Revenue vs costs by week/month/season. Charts showing:
+### 8.2 Overhead Allocation
+Monthly overhead line items from Company Settings (insurance, fuel, equipment, phone, etc.).
+System calculates cost-per-billable-day based on target days. Each job gets an overhead
+allocation factored into margin reporting.
+
+### 8.3 Job Financial Summary
+On each job detail page, a full breakdown:
+- Labour charged vs labour cost (employee gross + employer PRSI)
+- Materials charged vs materials cost
+- Equipment/rental cost
+- Overhead allocation for this job
+- Loyalty discount (real cost to business)
+- Contingency and margin
+- **Net profit on this job**
+
+If the job came from a quote: show quoted vs actual figures side by side.
+
+### 8.4 P&L Dashboard
+Revenue vs costs by week / month / season:
 - Revenue (invoiced)
-- Labour cost
+- Labour cost (from payroll)
 - Materials cost
 - Overhead allocation
 - Gross and net margin
-- Days worked vs target (160/year), overhead clearance date
+- Days worked vs target, overhead clearance date
 - Tax liability estimate (Irish sole trader rates)
+- VAT summary: outputs (invoiced) vs inputs (materials purchased), quarterly
 
-### 4.4 Job Financial Summary
-**What:** On each job detail page, a full breakdown:
-- Labour charged vs labour cost (margin)
-- Materials charged vs materials cost
-- Overhead allocation for this job
-- Loyalty discount (real cost to business)
-- Tax fraction
-- Net profit on this job
+### 8.5 Director / Owner Viability Model
+*Context: Jasper (sole trader) and Tobias (not yet formally in the business) want to know if
+the business could support both of them fully — replacing the dole, Jasper subsidising Tobias,
+and informal jobs for their mother. Plan is to go limited eventually and both draw proper wages.*
 
-### 4.5 Loyalty Points as Financial Entries
-**What:** When loyalty hours are earned or redeemed, post a journal entry.
-Loyalty liability on the balance sheet. Redemption reduces liability and revenue.
-**Note:** This requires the customer portal to exist (Phase 5) before redemption
-is possible, but the earning side can be built here.
+**Mechanism:** Treat owners as a special employee type (`type: director`) in the employee system.
+- Jasper and Tobias are added as director-type employees with a hypothetical hourly rate
+- They log their own hours the same way field staff do (via work logs)
+- Pay runs include director entries — calculated identically to employees (gross, PAYE, PRSI, USC)
+- Clearly labelled "Viability Model — not real payroll" in the UI
+- Incentive effect: hours worked = modelled wage earned, so there's a reason to track time properly
+
+**What it answers:**
+- What would the business owe us if it paid us properly at X/hour?
+- Does monthly revenue cover: employee wages + director model wages + materials + overheads?
+- How many more billable days per month are needed to close the gap?
+
+**Viability dashboard:** A simple summary — revenue this month vs full labour cost (real + modelled)
+vs overheads, showing the surplus/deficit. When the surplus is consistently positive, the business
+can support going limited. Target: ~€2,200/month net each (≈€800/week gross each).
+
+### 8.6 Loyalty Points as Financial Entries
+When loyalty points are earned or redeemed, post a journal entry. Loyalty liability on the
+balance sheet. Redemption reduces liability and revenue.
 
 ---
 
-## Phase 5 — Customer Portal
-*Depends on: 1.5 (customer role), Phase 4 (loyalty has financial meaning)*
+## Phase 9 — Customer Portal
+*Depends on: Phase 8 (loyalty has financial meaning), customer role (done)*
 
-### 5.1 Customer Login
-**What:** Customers log in with email/password. See only their own data.
-**Sees:** Loyalty balance, invoice history, job history (past visits).
-**Cannot see:** Other customers, rates, employee info, financials.
+### 9.1 Customer Login
+Email/password login. Customers see only their own data.
+- Loyalty balance and history
+- Invoice history
+- Past job history (dates, type, brief summary)
+- Cannot see: rates, employee info, other customers, financials
 
-### 5.2 Loyalty Programme UI
-**What:** Customer-facing loyalty dashboard.
-- Hours earned per job
+### 9.2 Loyalty Dashboard
+- Points earned per job
 - Current balance
-- How to earn more (referrals, reviews, nursery spend)
-- Redemption request (triggers admin notification)
-**Earning events:**
-- Maintenance billable hours (already tracked)
-- Referral (new lead converted with referral source = this customer)
-- Good review (admin manually awards)
-- Nursery purchase (Phase 6)
+- How to earn more (maintenance visits, referrals, reviews, nursery spend)
+- Redemption request → triggers admin notification + follow-up task
 
-### 5.3 Referral Tracking
-**What:** Referral code per customer. When a lead is created with that code, link it.
-On conversion, award loyalty points to the referrer.
+### 9.3 Appointment Queries
+- Customer submits a service request (type, preferred dates, notes)
+- Admin receives notification, can convert to Lead or Job directly
+- Not a booking system — a structured enquiry form
+
+### 9.4 Referral Tracking
+- Referral code per customer
+- New lead created with that code → linked to referrer
+- On job conversion, award loyalty points to referrer automatically
 
 ---
 
-## Phase 6 — Plant Nursery Integration
-*Depends on: Phase 5 (customer portal, loyalty points)*
+## Phase 10 — Plant Nursery
+*Depends on: Phase 9 (customer portal, loyalty points)*
 
-### 6.1 Product Catalogue
-**What:** Basic product listing (plants, supplies). Admin manages stock and pricing.
+### 10.1 Product Catalogue
+Admin manages plants, supplies, and accessories with stock quantities and prices.
 
-### 6.2 Loyalty Redemption in Shop
-**What:** Customers can spend loyalty points at checkout for discounts or free items.
+### 10.2 Loyalty Redemption in Shop
+Customers spend loyalty points at checkout for discounts or free items.
 Points redeemed → journal entry (liability cleared, discount posted).
 
-### 6.3 Nursery Purchase → Loyalty Points
-**What:** Purchase in nursery awards loyalty points. Cashier UI for admin to log
-in-person purchases against a customer account.
+### 10.3 Nursery Purchase → Loyalty Points
+In-person purchase cashier UI: admin logs sale against a customer account, points awarded automatically.
 
----
-
-## Phase 1.6 — Suppliers & Contacts Directory
-*No dependencies. Can be built any time.*
-
-### What
-A simple contacts/directory module for external people and companies the business interacts with.
-
-**Types (single table, `type` field):**
-- `supplier_company` — material/product suppliers (e.g. builders merchants, plant wholesalers)
-- `supplier_individual` — sole traders who supply goods
-- `tradesman` — skilled individuals who can be brought onto a job (electrician, plumber, etc.)
-- `other` — general contacts
-
-**Fields per contact:**
-- Name, company name (optional), type, trade/specialty
-- Phone, email
-- Notes
-- Active/inactive flag
-
-**Tradesmen extras:** day rate (for cost tracking when subcontracted)
-**Supplier extras:** what they typically supply (free text or tags)
-
-**No linkage to jobs yet** — directory only for now. Future: attach a tradesman to a work log as a subcontractor cost.
+### 10.4 Stock Management
+- Stock levels tracked per product
+- Low-stock alerts
+- Supplier linked to product (from Contacts module)
+- Purchase orders: record restock from supplier, updates stock level and posts materials cost journal entry
 
 ---
 
 ## Open Questions (resolve before each phase)
 
-- **Phase 3:** Do employees get app logins now, or later? Recommend now.
-- **Phase 4:** Irish sole trader or partnership for tax calc? Affects rates.
-- **Phase 4:** Do we want VAT returns assistance (inputs vs outputs) or just P&L?
-- **Phase 5:** Email/password login for customers, or magic link?
-- **Phase 6:** Is the nursery a separate physical till, or online only?
+- **Phase 7:** Timer mechanic — live stopwatch or log-after-the-fact? (affects mobile UX build)
+- **Phase 8:** Irish sole trader or partnership for tax calc? Affects P&L tax estimate rates.
+- **Phase 8:** VAT returns: assistance with quarterly filing, or just summary figures?
+- **Phase 9:** Customer login: email/password or magic link (passwordless)?
+- **Phase 10:** Is the nursery a separate physical till, or managed entirely through the app?
 
 ---
 
-## Current System — Known Gaps to Watch
-- `AddressLookupController.php` file still exists on server (routes removed, file harmless but messy)
-- PDF invoice template has no company logo or VAT number yet (Phase 1.1 unblocks this)
-- `weather_req` field exists on jobs but has no weather data to compare against yet (Phase 2)
-- Loyalty hours tracked on invoices but no customer-facing display yet (Phase 5)
-- Employee model exists but no management UI (Phase 3)
+## Known Gaps to Watch
+- `AddressLookupController.php` still exists on server (routes removed, file harmless but messy — delete on next backend-only deploy)
+- Work log follow-up banner not yet implemented (spec'd in Phase 6)
+- `weather_req` comparison uses forecast data correctly but could be smarter with rain probability thresholds
+- Loyalty points tracked on invoices but no customer-facing display until Phase 9

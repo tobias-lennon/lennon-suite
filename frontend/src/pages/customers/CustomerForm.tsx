@@ -15,6 +15,8 @@ interface FormData {
   minutes_from_hq: string
   discount_pct: string
   default_callout_fee: string
+  custom_rate: string
+  skip_loyalty: boolean
   address: {
     address_line_1: string
     address_line_2: string
@@ -29,6 +31,7 @@ interface FormErrors {
   email?: string
   phone?: string
   postcode?: string
+  county?: string
 }
 
 const IRISH_COUNTIES = [
@@ -43,7 +46,7 @@ const IRISH_COUNTIES = [
 
 const empty: FormData = {
   name: '', type: 'residential', phone: '', email: '', notes: '', rating: '', minutes_from_hq: '',
-  discount_pct: '', default_callout_fee: '',
+  discount_pct: '', default_callout_fee: '', custom_rate: '', skip_loyalty: false,
   address: { address_line_1: '', address_line_2: '', city: '', county: '', postcode: '' },
 }
 
@@ -120,6 +123,7 @@ export default function CustomerForm() {
   const phoneRef    = useRef<HTMLInputElement>(null)
   const emailRef    = useRef<HTMLInputElement>(null)
   const postcodeRef = useRef<HTMLInputElement>(null)
+  const countyRef   = useRef<HTMLSelectElement>(null)
 
   const fieldRefs: Record<typeof VALIDATED_FIELDS[number], React.RefObject<HTMLInputElement | null>> = {
     name: nameRef, phone: phoneRef, email: emailRef, postcode: postcodeRef,
@@ -131,7 +135,7 @@ export default function CustomerForm() {
       const c = r.data
       setForm({
         name: c.name ?? '',
-        type: c.type ?? 'residential',
+        type: ['residential', 'commercial'].includes(c.type) ? c.type : 'residential',
         phone: normalizePhone(c.phone ?? '') ?? '',
         email: c.email ?? '',
         notes: c.notes ?? '',
@@ -139,18 +143,20 @@ export default function CustomerForm() {
         minutes_from_hq: c.minutes_from_hq ? String(c.minutes_from_hq) : '',
         discount_pct: c.discount_pct ? String(c.discount_pct) : '',
         default_callout_fee: c.default_callout_fee ? String(c.default_callout_fee) : '',
+        custom_rate: c.custom_rate ? String(c.custom_rate) : '',
+        skip_loyalty: c.skip_loyalty ?? false,
         address: {
           address_line_1: c.address?.address_line_1 ?? '',
           address_line_2: c.address?.address_line_2 ?? '',
           city: c.address?.city ?? '',
-          county: c.address?.county ?? '',
+          county: (c.address?.county ?? '').toUpperCase(),
           postcode: c.address?.postcode ?? '',
         },
       })
     }).finally(() => setIsLoading(false))
   }, [id])
 
-  function set(field: keyof Omit<FormData, 'address'>, value: string) {
+  function set(field: keyof Omit<FormData, 'address'>, value: string | boolean) {
     const updated = { ...form, [field]: value }
     setForm(updated)
     if (touched.has(field)) setErrors(validate(updated))
@@ -197,6 +203,8 @@ export default function CustomerForm() {
       minutes_from_hq: form.minutes_from_hq ? parseInt(form.minutes_from_hq) : null,
       discount_pct: form.discount_pct ? parseFloat(form.discount_pct) : 0,
       default_callout_fee: form.default_callout_fee ? parseFloat(form.default_callout_fee) : null,
+      custom_rate: form.custom_rate ? parseFloat(form.custom_rate) : null,
+      skip_loyalty: form.skip_loyalty,
       address: {
         address_line_1: toTitleCase(form.address.address_line_1.trim()) ?? null,
         address_line_2: toTitleCase(form.address.address_line_2.trim()) ?? null,
@@ -215,6 +223,30 @@ export default function CustomerForm() {
         navigate(`/customers/${data.id}`)
       }
     } catch (err: any) {
+      if (err.response?.status === 422) {
+        const serverErrors: Record<string, string[]> = err.response.data?.errors ?? {}
+        const mapped: FormErrors = {}
+        if (serverErrors['name'])             mapped.name     = serverErrors['name'][0]
+        if (serverErrors['email'])            mapped.email    = serverErrors['email'][0]
+        if (serverErrors['phone'])            mapped.phone    = serverErrors['phone'][0]
+        if (serverErrors['address.postcode']) mapped.postcode = serverErrors['address.postcode'][0]
+        if (serverErrors['address.county'])   mapped.county   = serverErrors['address.county'][0]
+
+        if (Object.keys(mapped).length > 0) {
+          setErrors(mapped)
+          if (mapped.county) {
+            countyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            countyRef.current?.focus({ preventScroll: true })
+          } else {
+            const firstKey = VALIDATED_FIELDS.find(k => mapped[k])
+            const el = firstKey ? fieldRefs[firstKey].current : null
+            el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            el?.focus({ preventScroll: true })
+          }
+          setIsSaving(false)
+          return
+        }
+      }
       setSubmitError(err.response?.data?.message ?? 'Something went wrong.')
     } finally {
       setIsSaving(false)
@@ -355,11 +387,12 @@ export default function CustomerForm() {
                 className={inputCls(false)}
               />
             </Field>
-            <Field label="County">
+            <Field label="County" error={errors.county}>
               <select
-                value={IRISH_COUNTIES.includes(form.address.county) ? form.address.county : ''}
-                onChange={e => setAddr('county', e.target.value)}
-                className={inputCls(false)}
+                ref={countyRef}
+                value={form.address.county}
+                onChange={e => { setAddr('county', e.target.value); setErrors(prev => ({ ...prev, county: undefined })) }}
+                className={inputCls(!!errors.county)}
               >
                 <option value="">— Select county —</option>
                 {IRISH_COUNTIES.map(c => (
@@ -391,17 +424,33 @@ export default function CustomerForm() {
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: 'rgba(15,55,20,0.4)' }}>%</span>
               </div>
             </Field>
-            <Field label="Default Callout Fee (ex-VAT)">
+            <Field label="Default Callout Fee">
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: 'rgba(15,55,20,0.4)' }}>€</span>
                 <input
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="any"
                   value={form.default_callout_fee}
                   onChange={e => set('default_callout_fee', e.target.value)}
+                  onBlur={e => { const v = e.target.valueAsNumber; if (!isNaN(v)) set('default_callout_fee', v.toFixed(2)) }}
                   className={`${inputCls(false)} pl-7`}
                   placeholder="0.00"
+                />
+              </div>
+            </Field>
+            <Field label="Custom Hourly Rate">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: 'rgba(15,55,20,0.4)' }}>€</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={form.custom_rate}
+                  onChange={e => set('custom_rate', e.target.value)}
+                  onBlur={e => { const v = e.target.valueAsNumber; if (!isNaN(v)) set('custom_rate', v.toFixed(2)) }}
+                  className={`${inputCls(false)} pl-7`}
+                  placeholder="Overrides standard rate"
                 />
               </div>
             </Field>
@@ -409,7 +458,7 @@ export default function CustomerForm() {
         </div>
 
         {/* Notes */}
-        <div className="card p-6">
+        <div className="card p-6 flex flex-col gap-4">
           <Field label="Notes">
             <textarea
               value={form.notes}
@@ -419,6 +468,26 @@ export default function CustomerForm() {
               placeholder="Any relevant notes…"
             />
           </Field>
+
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <p className="text-sm font-semibold text-brand-dark">Loyalty Points</p>
+              <p className="text-xs mt-0.5" style={{ color: 'rgba(15,55,20,0.45)' }}>
+                Earns points on maintenance visits
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => set('skip_loyalty', !form.skip_loyalty)}
+              className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none"
+              style={{ backgroundColor: !form.skip_loyalty ? '#97B545' : 'rgba(15,55,20,0.15)' }}
+            >
+              <span
+                className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform duration-200"
+                style={{ transform: !form.skip_loyalty ? 'translateX(20px)' : 'translateX(0)' }}
+              />
+            </button>
+          </div>
         </div>
 
         {submitError && <p className="text-sm text-danger">{submitError}</p>}

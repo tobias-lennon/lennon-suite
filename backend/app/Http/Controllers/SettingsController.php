@@ -32,6 +32,7 @@ class SettingsController extends Controller
             'invoice_due_days'        => 'sometimes|integer|min:1|max:365',
             'invoice_prefix'          => 'sometimes|string|max:10',
             'loyalty_threshold_hours' => 'sometimes|integer|min:1',
+            'loyalty_credit_ex_vat'   => 'sometimes|numeric|min:0',
             'target_billable_days'    => 'sometimes|integer|min:1|max:366',
         ]);
 

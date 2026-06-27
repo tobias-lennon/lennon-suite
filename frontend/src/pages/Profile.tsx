@@ -44,44 +44,6 @@ export default function Profile() {
     }
   }
 
-  // ── App update ──────────────────────────────────────────────────
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'up-to-date' | 'available'>('idle')
-
-  async function handleCheckUpdate() {
-    setUpdateStatus('checking')
-    try {
-      const reg = await navigator.serviceWorker?.getRegistration()
-
-      // Force the browser to re-fetch the SW script and install any new version
-      if (reg) await reg.update()
-
-      // If a new SW downloaded and is waiting, activate it then reload
-      if (reg?.waiting) {
-        setUpdateStatus('available')
-        navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true })
-        reg.waiting.postMessage({ type: 'SKIP_WAITING' })
-        return
-      }
-
-      // No waiting SW — check version.json as fallback
-      const res = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' })
-      const { version: serverVersion } = await res.json()
-
-      if (serverVersion !== __APP_VERSION__) {
-        // Version differs but SW hasn't updated yet — nuke caches and reload fresh
-        setUpdateStatus('available')
-        const cacheKeys = await caches.keys()
-        await Promise.all(cacheKeys.map(k => caches.delete(k)))
-        await reg?.unregister()
-        window.location.reload()
-        return
-      }
-    } catch { /* offline or no service worker support */ }
-
-    setUpdateStatus('up-to-date')
-    setTimeout(() => setUpdateStatus('idle'), 3000)
-  }
-
   // ── Avatar upload ────────────────────────────────────────────────
   const fileInput = useRef<HTMLInputElement>(null)
   const [avatarLoading, setAvatarLoading] = useState(false)
@@ -187,34 +149,6 @@ export default function Profile() {
               Remove photo
             </button>
           </div>
-        )}
-      </div>
-
-      {/* ── App update ─────────────────────────────────────────────── */}
-      <div
-        className="rounded-3xl p-6 mb-5"
-        style={{ background: '#FDFAF5', boxShadow: '0 2px 16px rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.05)' }}
-      >
-        <div className="flex items-baseline justify-between mb-1">
-          <h2 className="text-base font-bold text-brand-dark">App Update</h2>
-          <span className="text-xs font-mono font-semibold" style={{ color: 'rgba(15,55,20,0.35)' }}>v{__APP_VERSION__}</span>
-        </div>
-        <p className="text-xs mb-4" style={{ color: 'rgba(15,55,20,0.45)' }}>
-          Check for the latest version of the app.
-        </p>
-        <button
-          onClick={handleCheckUpdate}
-          disabled={updateStatus === 'checking'}
-          className="w-full py-3 rounded-lg text-sm font-bold transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2 hover:brightness-95"
-          style={{ background: '#0F3714', color: 'white' }}
-        >
-          {updateStatus === 'checking' && <Spinner className="w-4 h-4 text-white" />}
-          {updateStatus === 'checking' ? 'Checking…' : 'Check for Update'}
-        </button>
-        {updateStatus === 'up-to-date' && (
-          <p className="text-sm font-semibold text-center mt-3" style={{ color: '#97B545' }}>
-            ✓ You're up to date
-          </p>
         )}
       </div>
 

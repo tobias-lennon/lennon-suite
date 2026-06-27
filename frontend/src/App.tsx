@@ -3,6 +3,7 @@ import './index.css'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import UpdatePrompt from './components/UpdatePrompt'
+import PatchNotesModal from './components/PatchNotesModal'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/AppLayout'
 import Spinner from './components/Spinner'
@@ -26,6 +27,10 @@ const Schedule     = lazy(() => import('./pages/Schedule'))
 const Office       = lazy(() => import('./pages/Office'))
 const ContactList  = lazy(() => import('./pages/contacts/ContactList'))
 const ContactForm  = lazy(() => import('./pages/contacts/ContactForm'))
+const MyHours      = lazy(() => import('./pages/MyHours'))
+const Payroll      = lazy(() => import('./pages/Payroll'))
+const PayrollDetail = lazy(() => import('./pages/PayrollDetail'))
+const MyPayslips   = lazy(() => import('./pages/MyPayslips'))
 
 function PageFallback() {
   return (
@@ -40,6 +45,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <UpdatePrompt />
+        <PatchNotesModal />
         <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -71,6 +77,10 @@ export default function App() {
               <Route path="/contacts"              element={<ContactList />} />
               <Route path="/contacts/new"          element={<ContactForm />} />
               <Route path="/contacts/:id/edit"     element={<ContactForm />} />
+              <Route path="/my-hours"              element={<MyHours />} />
+              <Route path="/my-payslips"          element={<MyPayslips />} />
+              <Route path="/payroll"              element={<Payroll />} />
+              <Route path="/payroll/:id"          element={<PayrollDetail />} />
               <Route path="/profile"               element={<Profile />} />
               <Route path="/settings"              element={<Settings />} />
             </Route>

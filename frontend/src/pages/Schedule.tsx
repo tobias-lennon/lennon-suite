@@ -411,13 +411,18 @@ export default function Schedule() {
   const [dragVisual, setDragVisual] = useState<{ type: 'job' | 'task'; id: number; item: JobSummary | TaskSummary; x: number; y: number } | null>(null)
   const [dragOverDate, setDragOverDate] = useState<string | null>(null)
   const [pendingDrop, setPendingDrop] = useState<{ type: 'job' | 'task'; id: number; targetDate: string } | null>(null)
-  const holdTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
-  const dragItemRef     = useRef<{ type: 'job' | 'task'; id: number; title: string; sourceDate: string | null } | null>(null)
-  const dragOverDateRef = useRef<string | null>(null)
-  const ghostRef        = useRef<HTMLDivElement>(null)
-  const scrollRAFRef    = useRef<number | null>(null)
-  const dragPointerRef  = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const holdTimerRef       = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pointerStartRef    = useRef<{ x: number; y: number } | null>(null)
+  const dragItemRef        = useRef<{ type: 'job' | 'task'; id: number; title: string; sourceDate: string | null } | null>(null)
+  const dragOverDateRef    = useRef<string | null>(null)
+  const ghostRef           = useRef<HTMLDivElement>(null)
+  const dragPointerRef     = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const scrollRAFRef       = useRef<number | null>(null)
+  const scrollContainerRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    scrollContainerRef.current = document.querySelector('main')
+  }, [])
 
   const fetchSchedule = useCallback((ws: string) => {
     setLoading(true); setError(false)
@@ -433,6 +438,21 @@ export default function Schedule() {
     api.get('/weather').then(r => setForecasts(r.data.forecasts ?? [])).catch(() => {})
   }, [])
 
+  function scrollTick() {
+    if (!dragItemRef.current) return
+    const { y } = dragPointerRef.current
+    const EDGE = 80, MAX_SPEED = 12
+    let speed = 0
+    if (y < EDGE) speed = -MAX_SPEED * (1 - y / EDGE)
+    else if (y > window.innerHeight - EDGE) speed = MAX_SPEED * (1 - (window.innerHeight - y) / EDGE)
+    if (speed !== 0) {
+      const container = scrollContainerRef.current
+      if (container) container.scrollTop += speed
+      else window.scrollBy(0, speed)
+    }
+    scrollRAFRef.current = requestAnimationFrame(scrollTick)
+  }
+
   function updateDragTarget(x: number, y: number) {
     const el = document.elementFromPoint(x, y)
     let node: Element | null = el
@@ -446,20 +466,11 @@ export default function Schedule() {
     const startX = e.clientX, startY = e.clientY
     pointerStartRef.current = { x: startX, y: startY }
     holdTimerRef.current = setTimeout(() => {
+      dragPointerRef.current = { x: startX, y: startY }
       dragItemRef.current = { type, id: item.id, title: item.title, sourceDate }
       setDragVisual({ type, id: item.id, item, x: startX, y: startY })
       navigator.vibrate?.(40)
-      const EDGE = 80, MAX_SPEED = 15
-      const tick = () => {
-        const { x, y } = dragPointerRef.current
-        const vh = window.innerHeight
-        let speed = 0
-        if (y < EDGE) speed = -((EDGE - y) / EDGE) * MAX_SPEED
-        else if (y > vh - EDGE) speed = ((y - (vh - EDGE)) / EDGE) * MAX_SPEED
-        if (speed !== 0) { window.scrollBy(0, speed); updateDragTarget(x, y) }
-        scrollRAFRef.current = requestAnimationFrame(tick)
-      }
-      scrollRAFRef.current = requestAnimationFrame(tick)
+      scrollRAFRef.current = requestAnimationFrame(scrollTick)
     }, 480)
   }
 
@@ -483,8 +494,8 @@ export default function Schedule() {
       updateDragTarget(e.clientX, e.clientY)
     }
     function onUp() {
+      if (scrollRAFRef.current) { cancelAnimationFrame(scrollRAFRef.current); scrollRAFRef.current = null }
       if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null }
-      if (scrollRAFRef.current !== null) { cancelAnimationFrame(scrollRAFRef.current); scrollRAFRef.current = null }
       pointerStartRef.current = null
       const item = dragItemRef.current
       const targetDate = dragOverDateRef.current
@@ -499,20 +510,16 @@ export default function Schedule() {
         setPendingDrop({ type: item.type, id: item.id, targetDate })
       }
     }
-    function noScroll(e: TouchEvent) { if (dragItemRef.current) e.preventDefault() }
     function noContextMenu(e: Event) { if (holdTimerRef.current || dragItemRef.current) e.preventDefault() }
     document.addEventListener('pointermove', onMove)
     document.addEventListener('pointerup', onUp)
     document.addEventListener('pointercancel', onUp)
-    document.addEventListener('touchmove', noScroll, { passive: false })
     document.addEventListener('contextmenu', noContextMenu)
     return () => {
       document.removeEventListener('pointermove', onMove)
       document.removeEventListener('pointerup', onUp)
       document.removeEventListener('pointercancel', onUp)
-      document.removeEventListener('touchmove', noScroll)
       document.removeEventListener('contextmenu', noContextMenu)
-      if (scrollRAFRef.current !== null) { cancelAnimationFrame(scrollRAFRef.current) }
     }
   }, [])
 

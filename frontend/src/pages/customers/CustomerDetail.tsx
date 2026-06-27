@@ -24,6 +24,7 @@ interface Customer {
   minutes_from_hq: number | null
   discount_pct: number
   default_callout_fee: number | null
+  custom_rate: number | null
   maintenance_hours_balance: number
   followups: CustomerFollowup[]
   address: {
@@ -359,7 +360,7 @@ export default function CustomerDetail() {
             {customer.maintenance_hours_balance > 0 && (
               <div className="rounded-2xl p-3.5" style={{ background: 'rgba(151,181,69,0.12)' }}>
                 <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(15,55,20,0.4)' }}>Loyalty</p>
-                <p className="text-xl font-black mt-1" style={{ color: '#97B545' }}>{customer.maintenance_hours_balance.toFixed(1)}<span className="text-sm font-semibold" style={{ color: 'rgba(151,181,69,0.6)' }}> hrs</span></p>
+                <p className="text-xl font-black mt-1" style={{ color: '#97B545' }}>{customer.maintenance_hours_balance.toFixed(1)}</p>
               </div>
             )}
 
@@ -373,7 +374,14 @@ export default function CustomerDetail() {
             {customer.default_callout_fee != null && customer.default_callout_fee > 0 && (
               <div className="col-span-2 rounded-2xl p-3.5" style={{ background: 'rgba(15,55,20,0.04)' }}>
                 <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(15,55,20,0.4)' }}>Default Callout</p>
-                <p className="text-xl font-black text-brand-dark mt-1">€{Number(customer.default_callout_fee).toFixed(2)}<span className="text-sm font-semibold" style={{ color: 'rgba(15,55,20,0.35)' }}> ex-VAT</span></p>
+                <p className="text-xl font-black text-brand-dark mt-1">€{Number(customer.default_callout_fee).toFixed(2)}<span className="text-sm font-semibold" style={{ color: 'rgba(15,55,20,0.35)' }}></span></p>
+              </div>
+            )}
+
+            {customer.custom_rate != null && customer.custom_rate > 0 && (
+              <div className="col-span-2 rounded-2xl p-3.5" style={{ background: 'rgba(184,74,42,0.08)', border: '1px solid rgba(184,74,42,0.2)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(184,74,42,0.7)' }}>Custom Rate</p>
+                <p className="text-xl font-black mt-1" style={{ color: '#B84A2A' }}>€{Number(customer.custom_rate).toFixed(2)}<span className="text-sm font-semibold" style={{ color: 'rgba(184,74,42,0.5)' }}>/hr</span></p>
               </div>
             )}
 

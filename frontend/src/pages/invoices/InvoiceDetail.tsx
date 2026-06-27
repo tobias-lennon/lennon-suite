@@ -11,6 +11,7 @@ interface LineItem {
   type: 'labour' | 'material' | 'callout'
   description: string
   quantity: number
+  unit: string | null
   unit_price: number
   amount: number
 }
@@ -34,6 +35,13 @@ interface Invoice {
   notes: string | null
   loyalty_hours_earned: number | null
   loyalty_balance_after: number | null
+  loyalty_credit_applied: boolean
+  loyalty_credit_amount: number | null
+  can_apply_loyalty_credit: boolean
+  has_pending_loyalty_credit: boolean
+  loyalty_credit_value_inc_vat: number | null
+  loyalty_credit_ex_vat: number | null
+  customer_loyalty_balance: number | null
   customer: {
     id: number
     name: string
@@ -93,6 +101,7 @@ export default function InvoiceDetail() {
   const [downloadingReceipt, setDownloadingReceipt] = useState(false)
   const [statusUpdating, setStatusUpdating] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [applyingCredit, setApplyingCredit] = useState(false)
 
   // Payment form
   const [showPaymentForm, setShowPaymentForm] = useState(false)
@@ -152,15 +161,35 @@ export default function InvoiceDetail() {
   async function handleDownloadPdf() {
     if (!invoice) return
     setDownloading(true)
-    await downloadBlob(`/invoices/${id}/download`, `invoice-${invoice.invoice_number}.pdf`)
-    setDownloading(false)
+    try {
+      await downloadBlob(`/invoices/${id}/download`, `INV-${invoice.invoice_number}.pdf`)
+    } finally {
+      setDownloading(false)
+    }
   }
 
   async function handleDownloadReceipt() {
     if (!invoice) return
     setDownloadingReceipt(true)
-    await downloadBlob(`/invoices/${id}/receipt`, `receipt-${invoice.invoice_number}.pdf`)
-    setDownloadingReceipt(false)
+    try {
+      await downloadBlob(`/invoices/${id}/receipt`, `REC-${invoice.invoice_number}.pdf`)
+    } finally {
+      setDownloadingReceipt(false)
+    }
+  }
+
+  async function applyLoyaltyCredit() {
+    if (!invoice) return
+    setApplyingCredit(true)
+    try {
+      await api.post(`/invoices/${id}/apply-loyalty`)
+      const res = await api.get(`/invoices/${id}`)
+      setInvoice(res.data)
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? 'Could not apply loyalty credit.')
+    } finally {
+      setApplyingCredit(false)
+    }
   }
 
   async function deleteInvoice() {
@@ -326,10 +355,11 @@ export default function InvoiceDetail() {
               <label className="block text-xs text-gray-500 mb-1">Amount Paid (€)</label>
               <input
                 type="number"
-                step="0.01"
+                step="any"
                 min="0"
                 value={paymentForm.amount_paid}
                 onChange={e => setPaymentForm(f => ({ ...f, amount_paid: e.target.value }))}
+                onBlur={e => { const v = e.target.valueAsNumber; if (!isNaN(v)) setPaymentForm(f => ({ ...f, amount_paid: v.toFixed(2) })) }}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#97B545]"
               />
               {paymentErrors.amount_paid && (
@@ -453,6 +483,7 @@ export default function InvoiceDetail() {
             <Link to={`/jobs/${invoice.job.id}`} className="text-[#97B545] hover:underline text-sm">
               {invoice.job.title}
             </Link>
+            <p className="text-xs text-gray-500 mt-0.5 capitalize">{invoice.job.type}</p>
           </div>
           <div>
             <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Dates</p>
@@ -468,6 +499,96 @@ export default function InvoiceDetail() {
           </div>
         )}
       </div>
+
+      {/* Loyalty panel — maintenance jobs with loyalty enabled (null hours_earned means skip_loyalty) */}
+      {invoice.loyalty_hours_earned !== null && invoice.job.type === 'maintenance' && (() => {
+        const THRESHOLD = 60
+        const balance   = invoice.customer_loyalty_balance ?? 0
+        // Visits earned from raw balance + any pending credits already auto-fired
+        // (checkMaintenanceLoyalty deducts from balance when firing, so we add those back)
+        const pendingBanked = invoice.has_pending_loyalty_credit ? 1 : 0
+        const visitsEarned  = Math.floor(balance / THRESHOLD) + pendingBanked
+        const overflow      = parseFloat((balance % THRESHOLD).toFixed(2))
+        const progressPct   = Math.min(100, (overflow / THRESHOLD) * 100)
+
+        return (
+          <div className="rounded-lg border p-5 mb-5" style={{ background: '#f3f8e8', borderColor: '#c8e08a' }}>
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-wide mb-1" style={{ color: '#0F3714' }}>
+                  ★ Maintenance Loyalty
+                </p>
+
+                {/* Visits earned badge */}
+                {visitsEarned >= 1 && !invoice.loyalty_credit_applied && (
+                  <p className="text-sm font-semibold mb-1" style={{ color: '#15803d' }}>
+                    {visitsEarned === 1 ? '1 complimentary visit earned' : `${visitsEarned} complimentary visits earned`}
+                  </p>
+                )}
+
+                {/* Points earned this job + progress towards next */}
+                <p className="text-sm text-gray-600">
+                  {invoice.loyalty_hours_earned != null && (
+                    <><span className="font-medium">{invoice.loyalty_hours_earned.toFixed(1)} points</span> earned this job
+                    {visitsEarned >= 1 ? ' · ' : ' · balance: '}</>
+                  )}
+                  {visitsEarned >= 1
+                    ? <span><span className="font-semibold">{overflow.toFixed(1)} points</span> towards next visit</span>
+                    : <span><span className="font-semibold">{balance.toFixed(1)} / {THRESHOLD} points</span> towards your next free visit</span>
+                  }
+                </p>
+
+                <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.1)', width: '12rem', maxWidth: '100%' }}>
+                  <div className="h-full rounded-full" style={{ width: `${progressPct}%`, background: '#97B545' }} />
+                </div>
+              </div>
+
+              {invoice.loyalty_credit_applied && invoice.loyalty_credit_amount != null && (
+                <div className="text-right shrink-0">
+                  <p className="text-xs font-bold" style={{ color: '#15803d' }}>✓ Credit Applied</p>
+                  <p className="text-lg font-bold" style={{ color: '#15803d' }}>−{fmt(invoice.loyalty_credit_amount)}</p>
+                  {invoice.loyalty_credit_ex_vat != null && (
+                    <p className="text-[10px] text-gray-400">€{invoice.loyalty_credit_ex_vat.toFixed(2)} ex. VAT</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Apply credit section */}
+            {invoice.can_apply_loyalty_credit && canManageInvoice && (
+              <div className="mt-4 pt-4 border-t" style={{ borderColor: '#c8e08a' }}>
+                <p className="text-sm text-gray-700 mb-3">
+                  Apply this customer's complimentary visit to this invoice?
+                  {invoice.loyalty_credit_value_inc_vat != null && (
+                    <> Worth <strong>€{invoice.loyalty_credit_value_inc_vat.toFixed(2)}</strong> inc. VAT
+                    {invoice.loyalty_credit_ex_vat != null && (
+                      <span className="text-gray-400"> (€{invoice.loyalty_credit_ex_vat.toFixed(2)} ex. VAT)</span>
+                    )}
+                    {invoice.loyalty_credit_value_inc_vat != null && invoice.total_due < invoice.loyalty_credit_value_inc_vat && (
+                      <span className="text-gray-500"> — invoice total is less than the credit value; this invoice will be zeroed out</span>
+                    )}
+                    .</>
+                  )}
+                </p>
+                <button
+                  onClick={applyLoyaltyCredit}
+                  disabled={applyingCredit}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg disabled:opacity-50 transition-opacity"
+                  style={{ background: '#0F3714', color: 'white' }}
+                >
+                  {applyingCredit && (
+                    <svg className="animate-spin w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  )}
+                  Apply Free Visit
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Line items — grouped by visit date */}
       {(() => {
@@ -498,6 +619,8 @@ export default function InvoiceDetail() {
             materials.push(item)
           }
         })
+
+        orderedDates.sort((a, b) => parseDate(a).getTime() - parseDate(b).getTime())
 
         // Strip the date from descriptions for display (we show it in the group header)
         function cleanDesc(desc: string): string {
@@ -578,7 +701,7 @@ export default function InvoiceDetail() {
                           </div>
                         </td>
                         <td className="px-4 py-2.5 text-right text-gray-400 hidden md:table-cell text-xs">
-                          {item.quantity} {/* qty for materials */}
+                          {Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(2)}{item.unit ? ` ${item.unit}` : ''}
                         </td>
                         <td className="px-4 py-2.5 text-right font-medium text-gray-900">{fmt(item.amount)}</td>
                       </tr>
@@ -604,6 +727,17 @@ export default function InvoiceDetail() {
                 <span>VAT ({invoice.vat_rate}%)</span>
                 <span>{fmt(invoice.vat_amount)}</span>
               </div>
+              {invoice.loyalty_credit_applied && invoice.loyalty_credit_amount != null && (
+                <div className="flex justify-between text-sm font-medium" style={{ color: '#15803d' }}>
+                  <span>
+                    ★ Loyalty Reward
+                    {invoice.loyalty_credit_ex_vat != null && (
+                      <span className="ml-1 font-normal text-gray-400 text-xs">(€{invoice.loyalty_credit_ex_vat.toFixed(2)} ex. VAT)</span>
+                    )}
+                  </span>
+                  <span>−{fmt(invoice.loyalty_credit_amount)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm font-semibold text-[#0F3714] border-t border-gray-100 pt-2 mt-1">
                 <span>Total Due</span>
                 <span className="text-base" style={{ color: '#97B545' }}>{fmt(invoice.total_due)}</span>

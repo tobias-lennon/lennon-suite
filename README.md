@@ -21,6 +21,10 @@ A full-stack Progressive Web App built to run the day-to-day operations of a rea
   </tr>
 </table>
 
+**Invoice PDF** — generated per job, with per-visit labour breakdown, materials, VAT, and loyalty reward applied automatically:
+
+<img src="docs/screenshots/invoice.png" width="700" alt="Invoice PDF" />
+
 ---
 
 ## Demo

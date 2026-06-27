@@ -1,8 +1,31 @@
 # Lennon Landscaping — Company Suite
 
-A full-stack Progressive Web App built to run the day-to-day operations of a real landscaping business. Handles everything from customer records and job scheduling through to invoicing, payroll, and crew management — replacing spreadsheets and paper with a single, mobile-friendly tool used in the field every day.
+A full-stack Progressive Web App built to run the day-to-day operations of a real landscaping business. Handles everything from customer records and job scheduling through to invoicing, payroll, and crew management — replacing spreadsheets and paper with a single mobile-first tool used in the field every day.
 
 **Live deployment:** [suite.lennonlandscaping.ie](https://suite.lennonlandscaping.ie)
+
+---
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><b>Dashboard</b></td>
+    <td align="center"><b>Schedule</b></td>
+    <td align="center"><b>Job Detail</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/dashboard.jpeg" width="260" alt="Dashboard" /></td>
+    <td><img src="docs/screenshots/schedule.jpeg" width="260" alt="Schedule" /></td>
+    <td><img src="docs/screenshots/jobs.jpeg" width="260" alt="Job Detail" /></td>
+  </tr>
+</table>
+
+---
+
+## Demo
+
+This is a live production application. Demo access is available on request — get in touch via [tobiaseastwoodlennon@gmail.com](mailto:tobiaseastwoodlennon@gmail.com).
 
 ---
 
@@ -38,25 +61,22 @@ A full-stack Progressive Web App built to run the day-to-day operations of a rea
 - Four job types: **Standard**, **Maintenance**, **Site Visit**, and **Internal** (admin tasks with no customer)
 - Status pipeline: Backlog → Scheduled → In Progress → Complete
 - Smart default sort: in-progress first, then scheduled by date (overdue at top), then backlog by due date
-- Estimated hours tracked; backlog total excludes jobs with no estimate so unconfirmed work doesn't inflate the figure
 - **Job Tasks** — sub-items on a job that can each be independently scheduled, assigned, and tracked to completion
 
 ### Work Logs
 - Each log represents one site visit on a job
 - Per-employee hour and rate entries, with billable hours and amount charged tracked separately
-- Materials and supplies logged per visit
-- Optional link to a specific job task
+- Materials and supplies logged per visit with per-job totals (labour cost, labour margin, materials)
 
 ### Schedule
 - 7-day calendar view with week navigation
 - **Drag-and-drop scheduling** — tap and hold a job or task card to lift it, drag to any day slot to assign (touch-native, works on mobile)
-- **Weather-aware scheduling** — each job and task carries a weather requirement (`dry only`, `frost free`, etc.); the calendar shows weather icons and flags conflicts
+- **Weather-aware scheduling** — each job carries a weather requirement (`dry only`, `frost free`, etc.); the calendar shows weather icons and flags conflicts per day
 - **Per-customer weather forecasts** — jobs show the forecast at the customer's location, not just the office
 - **Scheduling suggestions** — a "best day" chip on unscheduled cards calculates the earliest suitable day based on weather and due date
-- Overdue and needs-scheduling sections collapsible with smooth animation
 
 ### Weather
-- Powered by Open-Meteo (free, no API key required)
+- Powered by Open-Meteo (no API key required)
 - 9 weather conditions supported
 - Forecasts cached per location to avoid redundant API calls
 
@@ -73,7 +93,7 @@ A full-stack Progressive Web App built to run the day-to-day operations of a rea
 - Employee records with PPSN, tax credits, and payroll-relevant details
 - Payroll runs covering a defined date range
 - Per-employee payslip calculation with PAYE, PRSI, and USC breakdowns
-- Payslip PDF generation
+- Payslip PDF generation and email delivery
 - Employee self-service: crew members can view their own hours and payslips
 
 ### Leads
@@ -85,7 +105,7 @@ A full-stack Progressive Web App built to run the day-to-day operations of a rea
 - Address book for suppliers and business contacts, separate from customers
 
 ### Dashboard
-- Greeting, date, and current weather for the business location
+- Live 7-day weather forecast for the business location
 - Follow-ups due within 7 days with colour-coded urgency
 - Customer stats snapshot
 - Quick-action tiles for common tasks
@@ -101,52 +121,15 @@ A full-stack Progressive Web App built to run the day-to-day operations of a rea
 
 The app follows a clean API + SPA separation:
 
-- Laravel handles all data, business logic, PDF generation, and authentication (token-based via Sanctum)
-- React consumes the API; all navigation is client-side
+- Laravel handles all data, business logic, PDF generation, and authentication (Sanctum token-based)
+- React consumes the API; all navigation is client-side with React Router
 - The PWA service worker caches the shell so the app loads instantly after the first visit and works offline for cached routes
-- Builds are versioned via `version.json`; the frontend polls this on focus and prompts the user to update when a new version is deployed
+- Builds are versioned via `version.json`; the frontend polls on focus and prompts the user to update when a new version is deployed
 
 ### Rate & Billing Logic
-- A rate card defines the base rate, tool surcharge, waste surcharge, and maintenance rate
+- A rate card defines base rate, tool surcharge, waste surcharge, and maintenance rate
 - `RateCalculationService` resolves the correct rate per work log entry, respecting per-customer overrides
 - Customer discounts are applied by `InvoiceGenerationService` at the subtotal level only, not baked into hourly rates
-
----
-
-## Local Development
-
-### Prerequisites
-- PHP 8.3+, Composer
-- Node 20+, npm
-- MySQL
-
-### Backend
-
-```bash
-cd backend
-composer install
-cp .env.example .env
-# Edit .env — set DB_CONNECTION=mysql, DB_DATABASE, DB_USERNAME, DB_PASSWORD
-php artisan key:generate
-php artisan migrate --seed
-php artisan serve
-```
-
-The API will be available at `http://localhost:8000`.
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The app will be available at `http://localhost:5173`.
-
-Default admin credentials after seeding:
-- **Email:** tobias@lennonlandscaping.ie
-- **Password:** Admin2026!
 
 ---
 
@@ -162,7 +145,7 @@ cd frontend
 npm run test
 ```
 
-The backend test suite covers all major API endpoints (customers, jobs, work logs, invoices, payroll, scheduling, leads, contacts, rate cards, settings) plus unit tests for payroll calculations. The frontend suite covers form validation and UI behaviour.
+The backend suite covers all major API endpoints — customers, jobs, work logs, invoices, payroll, scheduling, leads, contacts, rate cards, and settings — plus unit tests for payroll calculations. The frontend suite covers form validation and UI behaviour across all major pages.
 
 ---
 
